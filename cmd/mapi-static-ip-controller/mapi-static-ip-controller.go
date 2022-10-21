@@ -147,7 +147,6 @@ func (a *MachineController) HandlePreCreate(ctx context.Context, machine *machin
 	}
 
 	vsphereProviderSpec.Network.Devices[0].Config = networkConfig
-	machine.Labels["test"] = "1"
 
 	rawExtension, err := RawExtensionFromProviderSpec(vsphereProviderSpec)
 	if err != nil {
@@ -220,6 +219,7 @@ func (a *MachineController) Reconcile(ctx context.Context, req reconcile.Request
 		}
 		log.Info("Removing preCreate hook")
 		machine.Spec.LifecycleHooks.PreCreate = a.FilterMyHook(hooks.PreCreate)
+		machine.Spec.LifecycleHooks.PreTerminate = append(machine.Spec.LifecycleHooks.PreTerminate, mgmt.GetLifecycleHook())
 		err = a.Update(ctx, machine)
 		if err != nil {
 			return reconcile.Result{}, err
