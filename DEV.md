@@ -11,7 +11,7 @@ Checklist:
 - [D] SPLAT-845: [Apply IP configuration to VM extraconfig to compute nodes](https://github.com/openshift/machine-api-operator/pull/1079)
 - [R] SPLAT-841: Update OpenShift API to include preCreate hook
 
-R=review
+R=PR in review
 D=PR in draft
 
 # Building the installer
@@ -42,30 +42,32 @@ go mod vendor
 # Building the machine API operator
 
 1. Clone the machine API repo
-2. Update go.mod to use API extensions in [api#1338](https://github.com/openshift/api/pull/1338)
+2. Apply the following patches:
+- https://patch-diff.githubusercontent.com/raw/openshift/machine-api-operator/pull/1079.patch
+3. Update go.mod to use API extensions in [api#1338](https://github.com/openshift/api/pull/1338)
 ~~~go
 replace github.com/openshift/api => github.com/rvanderp3/api v0.0.0-20230314214509-08e7188fa099
 ~~~
-3. Revendor 
+4. Revendor 
 ~~~sh
 go mod tidy
 go mod vendor
 ~~~
-4. Build the machine-api-operator and push to a registry accessible by the cluster.
+5. Build the machine-api-operator and push to a registry accessible by the cluster.
 ~~~sh
 REGISTRY="<your image registry>"
 podman build . --tag ${REGISTRY}/init/openshift:machine-api-operator:test
 podman push --authfile ~/auth.json ${REGISTRY}:8443/init/openshift:machine-api-operator-test
 ~~~
 
-5. Build an updated release image containing the test machine-api-operator image
+6. Build an updated release image containing the test machine-api-operator image
 ~~~sh
 RELEASE_IMAGE="<current cluster release image>"
 REGISTRY="<your image registry>"
 oc adm release new --from-release ${RELEASE_IMAGE} machine-api-operator=${REGISTRY}/init/openshift:machine-api-operator-test --to-image ${REGISTRY}/init/openshift:static-ip-release -a ~/pull-secret.txt
 ~~~
 
-6. Upgrade the cluster
+7. (Optional) Upgrade the cluster
 ~~~sh
 REGISTRY="<your image registry>"
 oc adm upgrade --to-image=${REGISTRY}/init/openshift:static-ip-release --force=true --allow-explicit-upgrade=true --allow-upgrade-with-warnings
