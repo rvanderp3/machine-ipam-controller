@@ -26,12 +26,48 @@ Within the context of static IPs, the installer is responsible for:
 ~~~go
 replace github.com/openshift/api => github.com/rvanderp3/api v0.0.0-20230314214509-08e7188fa099
 ~~~
-4. Build the installer
+4. Revendor 
+~~~sh
+go mod tidy
+go mod vendor
+~~~
+5. Build the installer
 ~~~sh
 ./hack/build.sh
 ~~~
 
 # Building the machine API operator
+
+1. Clone the machine API repo
+2. Update go.mod to use API extensions in [api#1338](https://github.com/openshift/api/pull/1338)
+~~~go
+replace github.com/openshift/api => github.com/rvanderp3/api v0.0.0-20230314214509-08e7188fa099
+~~~
+3. Revendor 
+~~~sh
+go mod tidy
+go mod vendor
+~~~
+4. Build the machine-api-operator and push to a registry accessible by the cluster.
+~~~sh
+REGISTRY="<your image registry>"
+podman build . --tag ${REGISTRY}/init/openshift:machine-api-operator:test
+podman push --authfile ~/auth.json ${REGISTRY}:8443/init/openshift:machine-api-operator-test
+~~~
+
+5. Build an updated release image containing the test machine-api-operator image
+~~~sh
+RELEASE_IMAGE="<current cluster release image>"
+REGISTRY="<your image registry>"
+oc adm release new --from-release ${RELEASE_IMAGE} machine-api-operator=${REGISTRY}/init/openshift:machine-api-operator-test --to-image ${REGISTRY}/init/openshift:static-ip-release -a ~/pull-secret.txt
+~~~
+
+6. Upgrade the cluster
+~~~sh
+REGISTRY="<your image registry>"
+oc adm upgrade --to-image=${REGISTRY}/init/openshift:static-ip-release --force=true --allow-explicit-upgrade=true --allow-upgrade-with-warnings
+~~~
+
 
 
 # End to End Testing
@@ -52,11 +88,15 @@ Prerequisites:
 
 1. Create manifests
 2. Create compute machine manifests with a static IP 
-3. Create cluster
+3. Create cluster with the built release image:
+~~~sh
+export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${REGISTRY}/init/openshift:static-ip-release
+openshift-install create cluster
+~~~
 
 # Samples
 
-## Sample platform spec with static IP addresses
+## platform spec with static IP addresses
 ~~~yaml
 platform:
   vsphere:
@@ -121,5 +161,51 @@ platform:
         - 192.168.1.215
 ~~~
 
+## compute machine with static IP
 
+~~~yaml
+apiVersion: machine.openshift.io/v1beta1
+kind: Machine
+metadata:
+  name: rvanderp5-dev-28z5n-worker-0-cp8gl-2
+  labels:
+    machine.openshift.io/cluster-api-cluster: rvanderp5-dev-28z5n
+    machine.openshift.io/cluster-api-machine-role: worker
+    machine.openshift.io/cluster-api-machine-type: worker    
+    machine.openshift.io/region: region1
+    machine.openshift.io/zone: ''
+spec:
+  lifecycleHooks: {}
+  metadata: {}
+  providerSpec:
+    value:
+      numCoresPerSocket: 2
+      diskGiB: 60
+      snapshot: ''
+      userDataSecret:
+        name: worker-user-data
+      memoryMiB: 16384
+      credentialsSecret:
+        name: vsphere-cloud-credentials
+      network:
+        devices:
+          - networkName: lab-pg
+            ipAddrs:
+            - 192.168.100.250/24
+            gateway4: 192.168.100.1
+            nameservers:
+            - 192.168.1.215            
+      metadata:
+        creationTimestamp: null
+      numCPUs: 4
+      kind: VSphereMachineProviderSpec
+      workspace:
+        datacenter: vanderlab
+        datastore: /vanderlab/datastore/workloadDatastore
+        folder: /vanderlab/vm/rvanderp5-dev-5dhsb
+        resourcePool: /vanderlab/host/workload-cluster-1//Resources
+        server: vcenter.vanderlab.net
+      template: rvanderp5-dev-28z5n-rhcos-vanderlab-zone-a
+      apiVersion: machine.openshift.io/v1beta1
+~~~
 
