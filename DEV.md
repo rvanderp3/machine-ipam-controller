@@ -8,8 +8,11 @@ Checklist:
 - [ ] SPLAT-847: Generate machine manifests for compute nodes
 - [ ] SPLAT-848: Generate machine manifests for control plane nodes
 - [R] SPLAT-873: start upstream CAPI enhancement for preCreate lifecycle hook
-- [ ] SPLAT-845: Apply IP configuration to VM extraconfig to compute nodes
+- [D] SPLAT-845: [Apply IP configuration to VM extraconfig to compute nodes](https://github.com/openshift/machine-api-operator/pull/1079)
 - [R] SPLAT-841: Update OpenShift API to include preCreate hook
+
+R=review
+D=PR in draft
 
 # Building the installer
 
