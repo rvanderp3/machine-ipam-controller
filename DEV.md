@@ -5,7 +5,7 @@ Checklist:
 - [D] SPLAT-828: [Update the installer platform specification](https://github.com/openshift/installer/pull/6982)
 - [D] SPLAT-846: [Apply IP configuration to VM extraconfig to bootstrap/control plane nodes](https://github.com/openshift/installer/pull/6512)
 - [R] SPLAT-843: [Update OpenShift API to include vSphere CAPV Static Network Definitions](https://github.com/openshift/api/pull/1338)
-- [ ] SPLAT-847: Generate machine manifests for compute nodes
+- [D] SPLAT-847: [Generate machine manifests for compute nodes](https://github.com/openshift/installer/pull/7023)
 - [ ] SPLAT-848: Generate machine manifests for control plane nodes
 - [R] SPLAT-873: start upstream CAPI enhancement for preCreate lifecycle hook
 - [D] SPLAT-845: [Apply IP configuration to VM extraconfig to compute nodes](https://github.com/openshift/machine-api-operator/pull/1079)
@@ -22,12 +22,16 @@ Within the context of static IPs, the installer is responsible for:
 
 
 1. Clone the installer repo
-2. Apply the following patches in order:
-- https://patch-diff.githubusercontent.com/raw/openshift/installer/pull/6982.patch
-- https://patch-diff.githubusercontent.com/raw/openshift/installer/pull/6512.patch
+2. Apply the installer patches that comprise the current changeset:
+~~~sh
+curl https://patch-diff.githubusercontent.com/raw/openshift/installer/pull/6982.patch | git apply
+curl https://patch-diff.githubusercontent.com/raw/openshift/installer/pull/7023.patch | git apply
+curl https://patch-diff.githubusercontent.com/raw/openshift/installer/pull/6512.patch | git apply
+~~~
+
 3. Update go.mod to use API extensions in [api#1338](https://github.com/openshift/api/pull/1338)
 ~~~go
-replace github.com/openshift/api => github.com/rvanderp3/api v0.0.0-20230314214509-08e7188fa099
+replace github.com/openshift/api => github.com/rvanderp3/api v0.0.0-20230320203849-e0ab19eba3b2
 ~~~
 4. Revendor 
 ~~~sh
@@ -43,10 +47,13 @@ go mod vendor
 
 1. Clone the machine API repo
 2. Apply the following patches:
-- https://patch-diff.githubusercontent.com/raw/openshift/machine-api-operator/pull/1079.patch
+~~~sh
+curl https://patch-diff.githubusercontent.com/raw/openshift/machine-api-operator/pull/1079.patch | git apply
+~~~
+
 3. Update go.mod to use API extensions in [api#1338](https://github.com/openshift/api/pull/1338)
 ~~~go
-replace github.com/openshift/api => github.com/rvanderp3/api v0.0.0-20230314214509-08e7188fa099
+replace github.com/openshift/api => github.com/rvanderp3/api v0.0.0-20230320203849-e0ab19eba3b2
 ~~~
 4. Revendor 
 ~~~sh
@@ -56,8 +63,8 @@ go mod vendor
 5. Build the machine-api-operator and push to a registry accessible by the cluster.
 ~~~sh
 REGISTRY="<your image registry>"
-podman build . --tag ${REGISTRY}/init/openshift:machine-api-operator:test
-podman push --authfile ~/auth.json ${REGISTRY}:8443/init/openshift:machine-api-operator-test
+podman build . --tag ${REGISTRY}/init/openshift:machine-api-operator-test
+podman push --authfile ~/auth.json ${REGISTRY}/init/openshift:machine-api-operator-test
 ~~~
 
 6. Build an updated release image containing the test machine-api-operator image
@@ -81,8 +88,8 @@ Functions implemented in draft or higher maturity PRs:
 - [*] Bootstrap and control plane nodes receive static IPs
 - [*] Draft of openshift/api changes
 - [ ] Control plane machine manifests reflect static IPs
-- [ ] Compute machine manifests reflect static IPs
-- [ ] Implementation of preProvision lifecycle hook
+- [*] Compute machine manifests reflect static IPs
+- [*] Implementation of preProvision lifecycle hook
 
 Prerequisites:
 - [*] Build the installer
