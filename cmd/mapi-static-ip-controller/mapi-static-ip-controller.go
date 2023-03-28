@@ -5,19 +5,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"k8s.io/klog/v2"
+
 	"os"
 	"sync"
 
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/rvanderp3/machine-ipam-controller/pkg/mgmt"
+	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
-	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -32,20 +31,17 @@ const (
 )
 
 var (
-	mgr manager.Manager
-	mu  sync.Mutex
-	log = logf.Log.WithName("ipam-controller")
+	mgr              manager.Manager
+	mu               sync.Mutex
+	reservedMachines = map[string]struct{}{}
 )
 
 func main() {
 	ctx := context.TODO()
-	logf.SetLogger(zap.New())
-
-	var log = logf.Log.WithName("builder-examples")
 
 	mgr, err := manager.New(config.GetConfigOrDie(), manager.Options{})
 	if err != nil {
-		log.Error(err, "could not create manager")
+		log.Errorf("could not create manager")
 		os.Exit(1)
 	}
 	osclientset.NewForConfig(config.GetConfigOrDie())
@@ -128,11 +124,15 @@ func (a *MachineController) FilterMyHook(hooks []machinev1beta1.LifecycleHook) [
 	return lifecycleHooks
 }
 
-func (a *MachineController) HandlePreCreate(ctx context.Context, machine *machinev1beta1.Machine) error {
+func (a *MachineController) HandlePreProvision(ctx context.Context, machine *machinev1beta1.Machine) error {
 	vsphereProviderSpec, err := ProviderSpecFromRawExtension(machine.Spec.ProviderSpec.Value)
 	if err != nil {
 		log.Error(err, "unable to parse vSphere provider spec")
 		return err
+	}
+	machineName := machine.ObjectMeta.Name
+	if _, exists := reservedMachines[machineName]; exists {
+		return nil
 	}
 	network := vsphereProviderSpec.Network
 	devices := network.Devices
@@ -145,19 +145,22 @@ func (a *MachineController) HandlePreCreate(ctx context.Context, machine *machin
 	if err != nil {
 		return err
 	}
-
-	vsphereProviderSpec.Network.Devices[0].Config = networkConfig
+	networkConfig.NetworkName = devices[0].NetworkName
+	vsphereProviderSpec.Network.Devices[0] = *networkConfig
 
 	rawExtension, err := RawExtensionFromProviderSpec(vsphereProviderSpec)
 	if err != nil {
 		return err
 	}
-	log.Info("setting IP address for machine")
+	log.Infof("setting IP address for machine %s", machineName)
 	machine.Spec.ProviderSpec.Value = rawExtension
 	err = a.Update(ctx, machine)
 	if err != nil {
+		mgmt.ReleaseIPConfiguration(ctx, networkConfig)
 		return err
 	}
+	reservedMachines[machineName] = struct{}{}
+
 	return nil
 }
 
@@ -167,6 +170,7 @@ func (a *MachineController) HandlePreTerminate(ctx context.Context, machine *mac
 		log.Error(err, "unable to parse vSphere provider spec")
 		return err
 	}
+	machineName := machine.ObjectMeta.Name
 	network := vsphereProviderSpec.Network
 	devices := network.Devices
 	if len(devices) != 1 {
@@ -175,7 +179,7 @@ func (a *MachineController) HandlePreTerminate(ctx context.Context, machine *mac
 	}
 
 	device := devices[0]
-	networkConfig := device.Config
+	networkConfig := &device
 	if networkConfig == nil {
 		return errors.New("network config not found")
 	}
@@ -191,6 +195,7 @@ func (a *MachineController) HandlePreTerminate(ctx context.Context, machine *mac
 	if err != nil {
 		return err
 	}
+	delete(reservedMachines, machineName)
 	return nil
 }
 
@@ -199,26 +204,25 @@ func (a *MachineController) Reconcile(ctx context.Context, req reconcile.Request
 	defer mu.Unlock()
 	machine := &machinev1beta1.Machine{}
 	if err := a.Get(ctx, req.NamespacedName, machine); err != nil {
-		log.Error(err, "unable to get machine")
 		return reconcile.Result{}, err
 	}
 
 	hooks := machine.Spec.LifecycleHooks
-	if len(hooks.PreCreate) > 0 {
+	if len(hooks.PreProvision) > 0 {
 		phase := machine.Status.Phase
 		if phase == nil || *phase != MACHINE_PHASE_PROVISIONING {
 			return reconcile.Result{}, nil
 		}
-		if a.HasMyHook(hooks.PreCreate) == false {
+		if a.HasMyHook(hooks.PreProvision) == false {
 			return reconcile.Result{}, nil
 		}
-		log.Info(fmt.Sprintf("machine %s has pre create hook", machine.Name))
-		err := a.HandlePreCreate(ctx, machine)
+		log.Infof("machine %s has pre create hook", machine.Name)
+		err := a.HandlePreProvision(ctx, machine)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
-		log.Info("Removing preCreate hook")
-		machine.Spec.LifecycleHooks.PreCreate = a.FilterMyHook(hooks.PreCreate)
+		log.Infof("Removing preProvision hook for %s", machine.Name)
+		machine.Spec.LifecycleHooks.PreProvision = a.FilterMyHook(hooks.PreProvision)
 		machine.Spec.LifecycleHooks.PreTerminate = append(machine.Spec.LifecycleHooks.PreTerminate, mgmt.GetLifecycleHook())
 		err = a.Update(ctx, machine)
 		if err != nil {
@@ -238,7 +242,7 @@ func (a *MachineController) Reconcile(ctx context.Context, req reconcile.Request
 		if err != nil {
 			log.Error(err, "unable to release IP with IP management backend. go to allow terminate.")
 		}
-		log.Info("Removing preTerminate hook")
+		log.Infof("Removing preTerminate hook for %s", machine.Name)
 		machine.Spec.LifecycleHooks.PreTerminate = a.FilterMyHook(hooks.PreTerminate)
 		err = a.Update(ctx, machine)
 		if err != nil {

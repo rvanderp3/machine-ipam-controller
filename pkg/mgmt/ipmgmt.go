@@ -3,10 +3,10 @@ package mgmt
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/netip"
 	"os"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/go-yaml/yaml"
 	goipam "github.com/metal-stack/go-ipam"
 	"github.com/openshift/api/machine/v1beta1"
@@ -42,53 +42,35 @@ func GetLifecycleHook() v1beta1.LifecycleHook {
 	return ipamConfig.IpamConfig.LifecycleHook
 }
 
-func GetIPConfiguration(ctx context.Context) (*v1beta1.NetworkConfig, error) {
+func GetIPConfiguration(ctx context.Context) (*v1beta1.NetworkDeviceSpec, error) {
 	ipAddr, err := ipam.AcquireIP(ctx, ipamPrefix.Cidr)
 	if err != nil {
 		return nil, err
 	}
-	networkConfig := v1beta1.NetworkConfig{
-		Interfaces: []v1beta1.Interface{
-			{
-				Name: "ens192",
-				IPV4: v1beta1.IPV4Addresses{
-					Address: []v1beta1.IPV4Address{
-						{
-							IP:           ipAddr.IP.String(),
-							PrefixLength: ipamConfig.IpamConfig.Prefix,
-						},
-					},
-				},
-			},
+	networkConfig := v1beta1.NetworkDeviceSpec{
+		DHCP4:    v1beta1.DisabledState,
+		DHCP6:    v1beta1.DisabledState,
+		Gateway4: ipamConfig.IpamConfig.DefaultGateway,
+		IPAddrs: []string{
+			fmt.Sprintf("%v/%v", ipAddr.IP.String(), ipamConfig.IpamConfig.Prefix),
 		},
-		DnsResolver: v1beta1.DnsResolver{
-			Config: v1beta1.DnsResolverConfig{
-				Server: ipamConfig.IpamConfig.NameServer,
-			},
-		},
-		Routes: v1beta1.Routes{
-			Config: []v1beta1.RouteConfig{
-				{
-					NextHopAddress: ipamConfig.IpamConfig.DefaultGateway,
-				},
-			},
-		},
+		Nameservers:   ipamConfig.IpamConfig.NameServer,
+		SearchDomains: nil,
 	}
-	spew.Dump(networkConfig)
 	return &networkConfig, nil
 }
 
-func ReleaseIPConfiguration(ctx context.Context, networkConfig *v1beta1.NetworkConfig) error {
-	if len(networkConfig.Interfaces) == 0 {
-		return errors.New("no interfaces associated with network config")
+func ReleaseIPConfiguration(ctx context.Context, networkConfig *v1beta1.NetworkDeviceSpec) error {
+	if len(networkConfig.IPAddrs) == 0 {
+		return errors.New("no IP addresses associated with network config")
 	}
-	iface := networkConfig.Interfaces[0]
-	addresses := iface.IPV4.Address
+
+	addresses := networkConfig.IPAddrs
 	if len(addresses) == 0 {
 		return errors.New("no IP addresses associated with the interface")
 	}
 	address := addresses[0]
-	parsedIP, err := netip.ParseAddr(address.IP)
+	parsedIP, err := netip.ParseAddr(address)
 	if err != nil {
 		return err
 	}
