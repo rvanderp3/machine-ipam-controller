@@ -18,7 +18,8 @@ const (
 )
 
 var ipam goipam.Ipamer
-var ipamPrefix *goipam.Prefix
+var ipamV4Prefix *goipam.Prefix
+var ipamV6Prefix *goipam.Prefix
 var ipamConfig data.IpamConfigSpec
 
 func Initialize(ctx context.Context) error {
@@ -31,7 +32,12 @@ func Initialize(ctx context.Context) error {
 		return err
 	}
 	ipam = goipam.New()
-	ipamPrefix, err = ipam.NewPrefix(ctx, ipamConfig.IpamConfig.IpRangeCidr)
+	if len(ipamConfig.IpamConfig.Ipv4RangeCidr) > 0 {
+		ipamV4Prefix, err = ipam.NewPrefix(ctx, ipamConfig.IpamConfig.Ipv4RangeCidr)
+	}
+	if len(ipamConfig.IpamConfig.Ipv6RangeCidr) > 0 {
+		ipamV6Prefix, err = ipam.NewPrefix(ctx, ipamConfig.IpamConfig.Ipv6RangeCidr)
+	}
 	if err != nil {
 		return nil
 	}
@@ -43,17 +49,29 @@ func GetLifecycleHook() v1beta1.LifecycleHook {
 }
 
 func GetIPConfiguration(ctx context.Context) (*v1beta1.NetworkDeviceSpec, error) {
-	ipAddr, err := ipam.AcquireIP(ctx, ipamPrefix.Cidr)
-	if err != nil {
-		return nil, err
+	var ipAddrs []string
+	if ipamV4Prefix != nil {
+		ipAddr, err := ipam.AcquireIP(ctx, ipamV4Prefix.Cidr)
+		if err != nil {
+			return nil, err
+		}
+		ipAddrs = append(ipAddrs, fmt.Sprintf("%v/%v", ipAddr.IP.String(), ipamConfig.IpamConfig.Ipv4Prefix))
 	}
+
+	if ipamV6Prefix != nil {
+		ipAddr, err := ipam.AcquireIP(ctx, ipamV6Prefix.Cidr)
+		if err != nil {
+			return nil, err
+		}
+		ipAddrs = append(ipAddrs, fmt.Sprintf("%v/%v", ipAddr.IP.String(), ipamConfig.IpamConfig.Ipv6Prefix))
+	}
+
 	networkConfig := v1beta1.NetworkDeviceSpec{
-		DHCP4:    v1beta1.DisabledState,
-		DHCP6:    v1beta1.DisabledState,
-		Gateway4: ipamConfig.IpamConfig.DefaultGateway,
-		IPAddrs: []string{
-			fmt.Sprintf("%v/%v", ipAddr.IP.String(), ipamConfig.IpamConfig.Prefix),
-		},
+		DHCP4:         v1beta1.DisabledState,
+		DHCP6:         v1beta1.DisabledState,
+		Gateway4:      ipamConfig.IpamConfig.GatewayIPv4,
+		Gateway6:      ipamConfig.IpamConfig.GatewayIPv6,
+		IPAddrs:       ipAddrs,
 		Nameservers:   ipamConfig.IpamConfig.NameServer,
 		SearchDomains: nil,
 	}

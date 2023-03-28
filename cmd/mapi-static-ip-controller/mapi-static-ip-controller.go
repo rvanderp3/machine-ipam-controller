@@ -240,7 +240,7 @@ func (a *MachineController) Reconcile(ctx context.Context, req reconcile.Request
 		}
 		err := a.HandlePreTerminate(ctx, machine)
 		if err != nil {
-			log.Error(err, "unable to release IP with IP management backend. go to allow terminate.")
+			log.Error(err, "unable to release IP with IP management backend. going to allow terminate.")
 		}
 		log.Infof("Removing preTerminate hook for %s", machine.Name)
 		machine.Spec.LifecycleHooks.PreTerminate = a.FilterMyHook(hooks.PreTerminate)

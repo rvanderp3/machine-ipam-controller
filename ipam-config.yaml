@@ -1,9 +1,12 @@
 ipam-config:
-  ip-range-cidr: 192.168.101.64/28
-  prefix: 23
+  ipv4-range-cidr: 192.168.101.64/28
+  ipv4-prefix: 23
+  ipv6-range-cidr: 2001::2/64
+  ipv6-prefix: 64
   nameserver:
     - 192.168.1.215
-  default-gateway: 192.168.100.1
+  ipv4-gateway: 192.168.100.1
+  ipv6-gateway: 2001::100
   lifecycle-hook:
     name: ipamController
     owner: network-admin
