@@ -27,20 +27,30 @@ of forming nmstate for machines.
 
 ~~~yaml
 ipam-config:
-  ip-range-cidr: 192.168.101.64/28
-  prefix: 23
+  ipv4-range-cidr: 192.168.101.64/28
+  ipv4-prefix: 23
+  ipv6-range-cidr: 2001::2/64
+  ipv6-prefix: 64
   nameserver:
     - 192.168.1.215
-  default-gateway: 192.168.100.1
+  ipv4-gateway: 192.168.100.1
+  ipv6-gateway: 2001::100
   lifecycle-hook:
     name: ipamController
     owner: network-admin
 ~~~
 
 Most parameters are self-explanatory, `lifecycle-hook` defines the lifecycle
-hook associated with this controller.  `machinesets` which should have static 
-IPs applied should be annotated with `preCreate` lifecycle hook matching the
-hook that is defined here.
+hook associated with this controller.  IPv4 and/or IPv6 addreses may be provisioned
+by the controller.  To disable IPv4 or IPv6, comment out the related fields in the 
+configuration.  
+
+Note: Be careful when configuring gateways in dual stack configurations.  Enabling 
+gateways for both IPv4 and IPv6 may have undesired effects depending on which gateway
+provides connectivity to external networks.
+
+`machinesets` which should have static IPs applied should be annotated with 
+`preProvision` lifecycle hook matching the hook that is defined here.
 
 For example:
 ~~~yaml
