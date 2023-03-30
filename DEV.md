@@ -6,10 +6,10 @@ Checklist:
 - [D] SPLAT-846: [Apply IP configuration to VM extraconfig to bootstrap/control plane nodes](https://github.com/openshift/installer/pull/6512)
 - [R] SPLAT-843: [Update OpenShift API to include vSphere CAPV Static Network Definitions](https://github.com/openshift/api/pull/1338)
 - [D] SPLAT-847: [Generate machine manifests for compute nodes](https://github.com/openshift/installer/pull/7023)
-- [ ] SPLAT-848: Generate machine manifests for control plane nodes
-- [R] SPLAT-873: start upstream CAPI enhancement for preCreate lifecycle hook
+- [D] SPLAT-848: [Generate machine manifests for control plane nodes](https://github.com/openshift/installer/pull/7023)
+- [R] SPLAT-873: [start upstream CAPI enhancement for preCreate lifecycle hook](https://github.com/kubernetes-sigs/cluster-api/pull/7647)
 - [D] SPLAT-845: [Apply IP configuration to VM extraconfig to compute nodes](https://github.com/openshift/machine-api-operator/pull/1079)
-- [R] SPLAT-841: Update OpenShift API to include preCreate hook
+- [R] SPLAT-841: [Update OpenShift API to include preProvision hook](https://github.com/openshift/api/pull/1334)
 
 R=PR in review
 D=PR in draft
@@ -53,7 +53,7 @@ curl https://patch-diff.githubusercontent.com/raw/openshift/machine-api-operator
 
 3. Update go.mod to use API extensions in [api#1338](https://github.com/openshift/api/pull/1338)
 ~~~go
-replace github.com/openshift/api => github.com/rvanderp3/api v0.0.0-20230320203849-e0ab19eba3b2
+replace github.com/openshift/api => github.com/rvanderp3/api v0.0.0-20230328180446-f831802ac8a4
 ~~~
 4. Revendor 
 ~~~sh
