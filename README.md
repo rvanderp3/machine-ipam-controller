@@ -16,10 +16,8 @@ deleted.
 ## Why does this even exist?
 This project intends to provide a prototype of the concepts discussed in
 https://github.com/rvanderp3/enhancements/tree/static-ip-addresses-vsphere .  
-Here are some draft pull requests of interest here that show current thoughts:
-- https://github.com/openshift/api/pull/1334
-- https://github.com/openshift/machine-api-operator/pull/1079
-- https://github.com/openshift/installer/pull/6512
+
+For details on building the installer and machine API changes, see [DEV.md](./docs/DEV.md)
 
 ## How do I configure it?
 Create a file called `ipam-config.yaml`.  This file defines the basics 
