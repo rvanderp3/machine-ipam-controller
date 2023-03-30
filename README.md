@@ -17,7 +17,7 @@ deleted.
 This project intends to provide a prototype of the concepts discussed in
 https://github.com/rvanderp3/enhancements/tree/static-ip-addresses-vsphere .  
 
-For details on building the installer and machine API changes, see [DEV.md](./docs/DEV.md)
+For details on building the installer and machine API changes, see [DEV.md](./DEV.md).
 
 ## How do I configure it?
 Create a file called `ipam-config.yaml`.  This file defines the basics 
