@@ -1,6 +1,6 @@
 package data
 
-import "github.com/openshift/api/machine/v1beta1"
+import machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 
 type IpamConfig struct {
 	Ipv4RangeCidr string                `yaml:"ipv4-range-cidr"`
@@ -10,7 +10,7 @@ type IpamConfig struct {
 	NameServer    []string              `yaml:"nameserver"`
 	GatewayIPv4   string                `yaml:"ipv4-gateway"`
 	GatewayIPv6   string                `yaml:"ipv6-gateway"`
-	LifecycleHook v1beta1.LifecycleHook `yaml:"lifecycle-hook"`
+	IPPool        machinev1beta1.IPPool `yaml:"ip-pool"`
 }
 
 type IpamConfigSpec struct {

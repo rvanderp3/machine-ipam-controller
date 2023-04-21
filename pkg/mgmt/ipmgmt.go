@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"net/netip"
 	"os"
 
@@ -11,6 +12,8 @@ import (
 	goipam "github.com/metal-stack/go-ipam"
 	"github.com/openshift/api/machine/v1beta1"
 	"github.com/rvanderp3/machine-ipam-controller/pkg/data"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -44,12 +47,9 @@ func Initialize(ctx context.Context) error {
 	return nil
 }
 
-func GetLifecycleHook() v1beta1.LifecycleHook {
-	return ipamConfig.IpamConfig.LifecycleHook
-}
-
-func GetIPConfiguration(ctx context.Context) (*v1beta1.NetworkDeviceSpec, error) {
+func GetIPAddress(ctx context.Context, ipPool *v1beta1.IPPool, ipClaim *v1beta1.IPAddressClaim) (*v1beta1.IPAddress, error) {
 	var ipAddrs []string
+
 	if ipamV4Prefix != nil {
 		ipAddr, err := ipam.AcquireIP(ctx, ipamV4Prefix.Cidr)
 		if err != nil {
@@ -66,19 +66,43 @@ func GetIPConfiguration(ctx context.Context) (*v1beta1.NetworkDeviceSpec, error)
 		ipAddrs = append(ipAddrs, fmt.Sprintf("%v/%v", ipAddr.IP.String(), ipamConfig.IpamConfig.Ipv6Prefix))
 	}
 
-	networkConfig := v1beta1.NetworkDeviceSpec{
-		DHCP4:         v1beta1.DisabledState,
-		DHCP6:         v1beta1.DisabledState,
-		Gateway4:      ipamConfig.IpamConfig.GatewayIPv4,
-		Gateway6:      ipamConfig.IpamConfig.GatewayIPv6,
-		IPAddrs:       ipAddrs,
-		Nameservers:   ipamConfig.IpamConfig.NameServer,
-		SearchDomains: nil,
+	ipAddress := v1beta1.IPAddress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ipClaim.GetName(),
+			Namespace: ipClaim.GetNamespace(),
+		},
+		Address: ipAddrs[0],
+		ClaimRef: &corev1.ObjectReference{
+			Kind: "IPAddressClaim",
+			Name: ipClaim.GetName(),
+			UID:  ipClaim.GetUID(),
+		},
+		Gateway: ipamConfig.IpamConfig.GatewayIPv4,
+		PoolRef: &corev1.ObjectReference{
+			Kind: "IPPool",
+			Name: ipPool.Name,
+			UID:  ipPool.UID,
+		},
+		Prefix: int64(ipamConfig.IpamConfig.Ipv4Prefix),
 	}
-	return &networkConfig, nil
+	ipClaim.Status.AddressRef = &corev1.ObjectReference{
+		Kind: "IPAddress",
+		Name: ipAddress.Name,
+	}
+	return &ipAddress, nil
 }
 
-func ReleaseIPConfiguration(ctx context.Context, networkConfig *v1beta1.NetworkDeviceSpec) error {
+func ReleaseIPConfiguration(ctx context.Context, networkConfig, ipClaim *v1beta1.IPAddressClaim) error {
+	if len(ipClaim.Finalizers) > 0 {
+		logrus.Infof("claim %s has pending finalizers, not releasing", ipClaim.Name)
+		return nil
+	}
+
+	if ipClaim.Status.AddressRef == nil {
+		logrus.Infof("claim %s no bound IP address, nothing to release", ipClaim.Name)
+		return nil
+	}
+
 	if len(networkConfig.IPAddrs) == 0 {
 		return errors.New("no IP addresses associated with network config")
 	}

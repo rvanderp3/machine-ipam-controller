@@ -97,4 +97,4 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
-replace github.com/openshift/api => github.com/rvanderp3/api v0.0.0-20230328180446-f831802ac8a4
+replace github.com/openshift/api => github.com/rvanderp3/api v0.0.0-20230421155637-2e93253df72c
