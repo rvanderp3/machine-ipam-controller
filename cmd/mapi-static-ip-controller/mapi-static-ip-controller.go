@@ -2,18 +2,16 @@ package main
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"k8s.io/klog/v2"
-
 	"os"
+	"strings"
 	"sync"
 
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
-	"github.com/rvanderp3/machine-ipam-controller/pkg/mgmt"
+	osclientset "github.com/openshift/client-go/config/clientset/versioned"
+	mapiclientset "github.com/openshift/client-go/machine/clientset/versioned"
 	log "github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -21,13 +19,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	osclientset "github.com/openshift/client-go/config/clientset/versioned"
-	mapiclientset "github.com/openshift/client-go/machine/clientset/versioned"
-)
-
-const (
-	MACHINE_PHASE_PROVISIONING = "Provisioning"
-	MACHINE_PHASE_DELETING     = "Deleting"
+	ipamcontrollerv1 "github.com/rvanderp3/machine-ipam-controller/pkg/apis/ipamcontroller.openshift.io/v1"
+	"github.com/rvanderp3/machine-ipam-controller/pkg/mgmt"
 )
 
 var (
@@ -37,7 +30,6 @@ var (
 )
 
 func main() {
-	ctx := context.TODO()
 
 	mgr, err := manager.New(config.GetConfigOrDie(), manager.Options{})
 	if err != nil {
@@ -45,14 +37,26 @@ func main() {
 		os.Exit(1)
 	}
 	osclientset.NewForConfig(config.GetConfigOrDie())
-	mgmt.Initialize(ctx)
 
 	mapiclientset.NewForConfig(config.GetConfigOrDie())
+
+	// Register object scheme to allow deserialization
 	machinev1beta1.AddToScheme(mgr.GetScheme())
+	ipamcontrollerv1.AddToScheme(mgr.GetScheme())
+
 	err = builder.
-		ControllerManagedBy(mgr).       // Create the ControllerManagedBy
-		For(&machinev1beta1.Machine{}). // ReplicaSet is the Application API
-		Complete(&MachineController{})
+		ControllerManagedBy(mgr). // Create the ControllerManagedBy
+		For(&machinev1beta1.IPAddressClaim{}).
+		Complete(&IPPoolClaimProcessor{})
+	if err != nil {
+		log.Error(err, "could not create claim processor")
+		os.Exit(1)
+	}
+
+	err = builder.
+		ControllerManagedBy(mgr). // Create the ControllerManagedBy
+		For(&ipamcontrollerv1.IPPool{}).
+		Complete(&IPPoolController{})
 	if err != nil {
 		log.Error(err, "could not create controller")
 		os.Exit(1)
@@ -64,195 +68,188 @@ func main() {
 	}
 }
 
-type MachineController struct {
+type IPPoolClaimProcessor struct {
 	client.Client
 }
 
-// RawExtensionFromProviderSpec marshals the machine provider spec.
-func RawExtensionFromProviderSpec(spec *machinev1beta1.VSphereMachineProviderSpec) (*runtime.RawExtension, error) {
-	if spec == nil {
-		return &runtime.RawExtension{}, nil
-	}
-
-	var rawBytes []byte
-	var err error
-	if rawBytes, err = json.Marshal(spec); err != nil {
-		return nil, fmt.Errorf("error marshalling providerSpec: %v", err)
-	}
-
-	return &runtime.RawExtension{
-		Raw: rawBytes,
-	}, nil
+type IPPoolController struct {
+	client.Client
 }
 
-// ProviderSpecFromRawExtension unmarshals the JSON-encoded spec
-func ProviderSpecFromRawExtension(rawExtension *runtime.RawExtension) (*machinev1beta1.VSphereMachineProviderSpec, error) {
-	if rawExtension == nil {
-		return &machinev1beta1.VSphereMachineProviderSpec{}, nil
-	}
-
-	spec := new(machinev1beta1.VSphereMachineProviderSpec)
-	if err := json.Unmarshal(rawExtension.Raw, &spec); err != nil {
-		return nil, fmt.Errorf("error unmarshalling providerSpec: %v", err)
-	}
-
-	klog.V(5).Infof("Got provider spec from raw extension: %+v", spec)
-	return spec, nil
-}
-
-func (a *MachineController) HasMyHook(hooks []machinev1beta1.LifecycleHook) bool {
-	myLifecycleHook := mgmt.GetLifecycleHook()
-	for _, installedHook := range hooks {
-		if installedHook == myLifecycleHook {
-			return true
-		}
-	}
-	return false
-}
-
-func (a *MachineController) FilterMyHook(hooks []machinev1beta1.LifecycleHook) []machinev1beta1.LifecycleHook {
-	myLifecycleHook := mgmt.GetLifecycleHook()
-
-	var lifecycleHooks []machinev1beta1.LifecycleHook
-	for _, installedHook := range hooks {
-		if installedHook == myLifecycleHook {
-			continue
-		}
-		lifecycleHooks = append(lifecycleHooks, installedHook)
-	}
-
-	return lifecycleHooks
-}
-
-func (a *MachineController) HandlePreProvision(ctx context.Context, machine *machinev1beta1.Machine) error {
-	vsphereProviderSpec, err := ProviderSpecFromRawExtension(machine.Spec.ProviderSpec.Value)
+func (a *IPPoolClaimProcessor) BindClaim(ctx context.Context, ipAddressClaim *machinev1beta1.IPAddressClaim) error {
+	log.Info("Received BindClaim")
+	ip, err := mgmt.GetIPAddress(ctx, ipAddressClaim)
 	if err != nil {
-		log.Error(err, "unable to parse vSphere provider spec")
+		log.Errorf("Unable to get IPAddress: %v", err)
 		return err
 	}
-	machineName := machine.ObjectMeta.Name
-	if _, exists := reservedMachines[machineName]; exists {
-		return nil
-	}
-	network := vsphereProviderSpec.Network
-	devices := network.Devices
-	if len(devices) != 1 {
-		log.Error(err, "only a single network adapter is supported")
-		return err
-	}
-	networkConfig, err := mgmt.GetIPConfiguration(ctx)
+	log.Infof("Got IPAddress %v", ip)
 
-	if err != nil {
+	// create ipaddress object
+	if err = a.Client.Create(ctx, ip); err != nil {
+		log.Errorf("Unable to create IPAddress: %v", err)
 		return err
 	}
-	networkConfig.NetworkName = devices[0].NetworkName
-	vsphereProviderSpec.Network.Devices[0] = *networkConfig
 
-	rawExtension, err := RawExtensionFromProviderSpec(vsphereProviderSpec)
-	if err != nil {
+	// Update status
+	if err = a.Client.Status().Update(ctx, ipAddressClaim); err != nil {
+		log.Errorf("Unable to update claim: %v", err)
 		return err
 	}
-	log.Infof("setting IP address for machine %s", machineName)
-	machine.Spec.ProviderSpec.Value = rawExtension
-	err = a.Update(ctx, machine)
-	if err != nil {
-		mgmt.ReleaseIPConfiguration(ctx, networkConfig)
-		return err
-	}
-	reservedMachines[machineName] = struct{}{}
 
+	log.Infof("IAC: %v", ipAddressClaim)
 	return nil
 }
 
-func (a *MachineController) HandlePreTerminate(ctx context.Context, machine *machinev1beta1.Machine) error {
-	vsphereProviderSpec, err := ProviderSpecFromRawExtension(machine.Spec.ProviderSpec.Value)
-	if err != nil {
-		log.Error(err, "unable to parse vSphere provider spec")
+func (a *IPPoolClaimProcessor) ReleaseClaim(ctx context.Context, namespacedName types.NamespacedName) error {
+	log.Info("Received ReleaseClaim")
+	ipAddress := &machinev1beta1.IPAddress{}
+	if err := a.Get(ctx, namespacedName, ipAddress); err != nil {
 		return err
 	}
-	machineName := machine.ObjectMeta.Name
-	network := vsphereProviderSpec.Network
-	devices := network.Devices
-	if len(devices) != 1 {
-		log.Error(err, "only a single network adapter is supported")
+	log.Infof("Got IPAddress %v (%v)", ipAddress.Name, ipAddress.Spec.Address)
+	if err := mgmt.ReleaseIPConfiguration(ctx, ipAddress); err != nil {
+		log.Warnf("Unable to release IP: %v", err)
 		return err
 	}
-
-	device := devices[0]
-	networkConfig := &device
-	if networkConfig == nil {
-		return errors.New("network config not found")
-	}
-	mgmt.ReleaseIPConfiguration(ctx, networkConfig)
-
-	rawExtension, err := RawExtensionFromProviderSpec(vsphereProviderSpec)
-	if err != nil {
-		return err
-	}
-	log.Info("released IP address for machine")
-	machine.Spec.ProviderSpec.Value = rawExtension
-	err = a.Update(ctx, machine)
-	if err != nil {
-		return err
-	}
-	delete(reservedMachines, machineName)
-	return nil
+	log.Infof("Deleting ipaddress CR %v", ipAddress.Name)
+	err := a.Delete(ctx, ipAddress)
+	return err
 }
 
-func (a *MachineController) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
+func (a *IPPoolClaimProcessor) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
 	mu.Lock()
 	defer mu.Unlock()
-	machine := &machinev1beta1.Machine{}
-	if err := a.Get(ctx, req.NamespacedName, machine); err != nil {
+
+	log.Infof("Received request %v", req)
+
+	ipAddressClaim := &machinev1beta1.IPAddressClaim{}
+	if err := a.Get(ctx, req.NamespacedName, ipAddressClaim); err != nil {
+		log.Warnf("Got error: %v", err)
+		if strings.Contains(fmt.Sprintf("%v%", err), "not found") {
+			log.Info("Handling remove of claim")
+			a.ReleaseClaim(ctx, req.NamespacedName)
+			return reconcile.Result{}, nil
+		}
 		return reconcile.Result{}, err
 	}
+	log.Infof("Got IPAddressClaim %v", ipAddressClaim.Name)
 
-	hooks := machine.Spec.LifecycleHooks
-	if len(hooks.PreProvision) > 0 {
-		phase := machine.Status.Phase
-		if phase == nil || *phase != MACHINE_PHASE_PROVISIONING {
-			return reconcile.Result{}, nil
-		}
-		if a.HasMyHook(hooks.PreProvision) == false {
-			return reconcile.Result{}, nil
-		}
-		log.Infof("machine %s has pre create hook", machine.Name)
-		err := a.HandlePreProvision(ctx, machine)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
-		log.Infof("Removing preProvision hook for %s", machine.Name)
-		machine.Spec.LifecycleHooks.PreProvision = a.FilterMyHook(hooks.PreProvision)
-		machine.Spec.LifecycleHooks.PreTerminate = append(machine.Spec.LifecycleHooks.PreTerminate, mgmt.GetLifecycleHook())
-		err = a.Update(ctx, machine)
-		if err != nil {
-			return reconcile.Result{}, err
+	// Check claim to see if it needs IP from a pool that we own.
+	poolRef := ipAddressClaim.Spec.PoolRef
+	log.Debugf("Kind(%v) Group(%v) Name(%v)", poolRef.Kind, *poolRef.APIGroup, poolRef.Name)
+	if poolRef.Kind == ipamcontrollerv1.IPPoolKind && *poolRef.APIGroup == ipamcontrollerv1.APIGroupName {
+		log.Debugf("Found a claim for an IP from this provider.  Status: %v", ipAddressClaim.Status)
+		if ipAddressClaim.Status.AddressRef.Name == "" {
+			err := a.BindClaim(ctx, ipAddressClaim)
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+		} else {
+			// Status was set.  Verify address still exists?
+			log.Info("Ignoring claim due to address already in status")
 		}
 	}
 
-	if len(hooks.PreTerminate) > 0 {
-		phase := machine.Status.Phase
-		if phase == nil || *phase != MACHINE_PHASE_DELETING {
-			return reconcile.Result{}, nil
-		}
-		if a.HasMyHook(hooks.PreTerminate) == false {
-			return reconcile.Result{}, nil
-		}
-		err := a.HandlePreTerminate(ctx, machine)
-		if err != nil {
-			log.Error(err, "unable to release IP with IP management backend. going to allow terminate.")
-		}
-		log.Infof("Removing preTerminate hook for %s", machine.Name)
-		machine.Spec.LifecycleHooks.PreTerminate = a.FilterMyHook(hooks.PreTerminate)
-		err = a.Update(ctx, machine)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
-	}
 	return reconcile.Result{}, nil
 }
 
-func (a *MachineController) InjectClient(c client.Client) error {
+func (a *IPPoolClaimProcessor) InjectClient(c client.Client) error {
+	a.Client = c
+	log.Info("Set client for claim processor")
+	return nil
+}
+
+func (a *IPPoolController) LoadPool(ctx context.Context, pool *ipamcontrollerv1.IPPool) error {
+	log.Infof("Loading pool: %v", pool.Name)
+
+	// Initialize pool
+	err := mgmt.InitializePool(ctx, pool)
+	if err == nil {
+		// Let's get all IPAddresses and see what has been already claimed to sync
+		// the pool
+		options := client.ListOptions{
+			Namespace: pool.Namespace,
+		}
+		ipList := machinev1beta1.IPAddressList{}
+		err = a.List(ctx, &ipList, &options)
+		for _, ip := range ipList.Items {
+			if ip.Spec.PoolRef.Name == pool.Name {
+				log.Infof("Found IP: %v", ip.Spec.Address)
+				err = mgmt.ClaimIPAddress(ctx, pool, ip)
+				if err != nil {
+					log.Warnf("An error occurred when trying to claim IP %v: %v", ip.Spec.Address, err)
+				} else {
+					log.Debugf("IP %v is not part of pool %v", ip.Spec.Address, pool.Name)
+				}
+			}
+		}
+	}
+	return err
+}
+
+func (a *IPPoolController) RemovePool(ctx context.Context, pool string) error {
+	log.Infof("Removing pool %v", pool)
+	ipAddresses := &machinev1beta1.IPAddressList{}
+	err := a.Client.List(ctx, ipAddresses)
+	if err != nil {
+		log.Warnf("Unable to get IPAddresses: %v", err)
+		return err
+	}
+
+	log.Info("Searching for linked IPAddresses...")
+	for _, ip := range ipAddresses.Items {
+		log.Debugf("Checking IPAddress: %v", ip.Name)
+		if fmt.Sprintf("%v/%v", ip.Namespace, ip.Spec.PoolRef.Name) == pool {
+			log.Infof("Deleting ipaddress CR %v", ip.Name)
+			mgmt.ReleaseIPConfiguration(ctx, &ip)
+			err = a.Delete(ctx, &ip)
+			if err != nil {
+				log.Warnf("Error occurred while cleaning up IP: %v", err)
+			}
+		}
+	}
+
+	log.Info("Removing pool from mgmt...")
+	err = mgmt.RemovePool(ctx, pool)
+	if err != nil {
+		log.Warnf("Error removing pool from mgmt: %v", err)
+	}
+	return err
+}
+
+func (a *IPPoolController) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	log.Infof("Received request %v", req)
+
+	pool := &ipamcontrollerv1.IPPool{}
+	if err := a.Get(ctx, req.NamespacedName, pool); err != nil {
+		log.Warnf("Got error: %v", err)
+		switch t := err.(type) {
+		default:
+			log.Infof("Type: %v", t)
+
+		}
+		if strings.Contains(fmt.Sprintf("%v", err), "not found") {
+			log.Info("Handling remove of claim")
+			a.RemovePool(ctx, fmt.Sprintf("%v", req))
+			return reconcile.Result{}, nil
+		} else {
+			return reconcile.Result{}, err
+		}
+	}
+	log.Infof("Got Pool %v", pool.Name)
+	if err := a.LoadPool(ctx, pool); err != nil {
+		log.Errorf("Unable to load pool: %v", err)
+		return reconcile.Result{}, err
+	}
+
+	return reconcile.Result{}, nil
+}
+
+func (a *IPPoolController) InjectClient(c client.Client) error {
 	a.Client = c
 	return nil
 }

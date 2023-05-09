@@ -26,10 +26,6 @@ case "${MODE}" in
 release)
 	LDFLAGS="${LDFLAGS} -s -w"
 	TAGS="${TAGS} release okd"
-	if test "${SKIP_GENERATION}" != y
-	then
-		go generate ./data
-	fi
 	;;
 dev)
 	;;
