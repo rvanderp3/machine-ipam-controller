@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
+	ipamv1 "sigs.k8s.io/cluster-api/exp/ipam/api/v1alpha1"
 
 	goipam "github.com/metal-stack/go-ipam"
-	"github.com/openshift/api/machine/v1beta1"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -65,7 +65,7 @@ func RemovePool(ctx context.Context, pool string) error {
 	return err
 }
 
-func ClaimIPAddress(ctx context.Context, pool *v1.IPPool, address v1beta1.IPAddress) error {
+func ClaimIPAddress(ctx context.Context, pool *v1.IPPool, address ipamv1.IPAddress) error {
 	poolInfo := ipams[poolKey(pool)]
 	if poolInfo.IPPool == nil {
 		return errors.New("pool not initialized")
@@ -80,7 +80,7 @@ func ClaimIPAddress(ctx context.Context, pool *v1.IPPool, address v1beta1.IPAddr
 	return nil
 }
 
-func GetIPAddress(ctx context.Context, ipClaim *v1beta1.IPAddressClaim) (*v1beta1.IPAddress, error) {
+func GetIPAddress(ctx context.Context, ipClaim *ipamv1.IPAddressClaim) (*ipamv1.IPAddress, error) {
 	var ipAddrs []string
 
 	poolInfo := ipams[fmt.Sprintf("%v/%v", ipClaim.Namespace, ipClaim.Spec.PoolRef.Name)]
@@ -94,22 +94,22 @@ func GetIPAddress(ctx context.Context, ipClaim *v1beta1.IPAddressClaim) (*v1beta
 	}
 	ipAddrs = append(ipAddrs, fmt.Sprintf("%v", ipAddr.IP.String()))
 
-	ipAddress := v1beta1.IPAddress{
+	ipAddress := ipamv1.IPAddress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ipClaim.GetName(),
 			Namespace: ipClaim.GetNamespace(),
 		},
-		Spec: v1beta1.IPAddressSpec{
+		Spec: ipamv1.IPAddressSpec{
 			Address: ipAddrs[0],
-			ClaimRef: &corev1.LocalObjectReference{
+			ClaimRef: corev1.LocalObjectReference{
 				Name: ipClaim.GetName(),
 			},
 			Gateway: poolInfo.IPPool.Spec.Gateway,
-			PoolRef: &corev1.TypedLocalObjectReference{
+			PoolRef: corev1.TypedLocalObjectReference{
 				Kind: "IPPool",
 				Name: ipClaim.Spec.PoolRef.Name,
 			},
-			Prefix: int64(poolInfo.IPPool.Spec.Prefix),
+			Prefix: poolInfo.IPPool.Spec.Prefix,
 		},
 	}
 	ipClaim.Status.AddressRef = corev1.LocalObjectReference{
@@ -118,7 +118,7 @@ func GetIPAddress(ctx context.Context, ipClaim *v1beta1.IPAddressClaim) (*v1beta
 	return &ipAddress, nil
 }
 
-func ReleaseIPConfiguration(ctx context.Context, ipAddr *v1beta1.IPAddress) error {
+func ReleaseIPConfiguration(ctx context.Context, ipAddr *ipamv1.IPAddress) error {
 	address := ipAddr.Spec.Address
 	if address == "" {
 		return errors.New("no IP addresses associated with the interface")
