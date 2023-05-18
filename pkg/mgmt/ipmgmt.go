@@ -5,97 +5,138 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
-	"os"
 
-	"github.com/go-yaml/yaml"
 	goipam "github.com/metal-stack/go-ipam"
 	"github.com/openshift/api/machine/v1beta1"
-	"github.com/rvanderp3/machine-ipam-controller/pkg/data"
+	log "github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	v1 "github.com/rvanderp3/machine-ipam-controller/pkg/apis/ipamcontroller.openshift.io/v1"
 )
 
-const (
-	IPConfigurationFile = "ipam-config.yaml"
-)
+type PoolInfo struct {
+	IPPool *v1.IPPool
+	Prefix *goipam.Prefix
+}
 
-var ipam goipam.Ipamer
-var ipamV4Prefix *goipam.Prefix
-var ipamV6Prefix *goipam.Prefix
-var ipamConfig data.IpamConfigSpec
+var ipam = goipam.New()
+var ipams = make(map[string]PoolInfo)
 
-func Initialize(ctx context.Context) error {
-	configRaw, err := os.ReadFile(IPConfigurationFile)
-	if err != nil {
-		return err
+func poolKey(pool *v1.IPPool) string {
+	return fmt.Sprintf("%v/%v", pool.Namespace, pool.Name)
+}
+
+func InitializePool(ctx context.Context, pool *v1.IPPool) error {
+	key := poolKey(pool)
+
+	if ipams[key].IPPool == nil {
+		if len(pool.Spec.AddressCidr) > 0 {
+			ipamPrefix, err := ipam.NewPrefix(ctx, pool.Spec.AddressCidr)
+			if err != nil {
+				return err
+			}
+			log.Infof("Created prefix %v", ipamPrefix)
+			ipams[key] = PoolInfo{
+				IPPool: pool,
+				Prefix: ipamPrefix,
+			}
+		}
+	} else {
+		// pool already initialized.  Need to validate nothing changed.
+		log.Info("Pool already initialized.")
 	}
-	err = yaml.Unmarshal(configRaw, &ipamConfig)
-	if err != nil {
-		return err
-	}
-	ipam = goipam.New()
-	if len(ipamConfig.IpamConfig.Ipv4RangeCidr) > 0 {
-		ipamV4Prefix, err = ipam.NewPrefix(ctx, ipamConfig.IpamConfig.Ipv4RangeCidr)
-	}
-	if len(ipamConfig.IpamConfig.Ipv6RangeCidr) > 0 {
-		ipamV6Prefix, err = ipam.NewPrefix(ctx, ipamConfig.IpamConfig.Ipv6RangeCidr)
-	}
-	if err != nil {
-		return nil
-	}
+
 	return nil
 }
 
-func GetLifecycleHook() v1beta1.LifecycleHook {
-	return ipamConfig.IpamConfig.LifecycleHook
+func RemovePool(ctx context.Context, pool string) error {
+	var err error
+	// Remove associated IPAddresses
+	ippool := ipams[pool]
+	if ippool.IPPool != nil {
+		log.Info("Removing Prefix...")
+		ips := ippool.Prefix
+		_, err = ipam.DeletePrefix(ctx, ips.Cidr)
+	}
+
+	// Remove Pool
+	ipams[pool] = PoolInfo{}
+	return err
 }
 
-func GetIPConfiguration(ctx context.Context) (*v1beta1.NetworkDeviceSpec, error) {
+func ClaimIPAddress(ctx context.Context, pool *v1.IPPool, address v1beta1.IPAddress) error {
+	poolInfo := ipams[poolKey(pool)]
+	if poolInfo.IPPool == nil {
+		return errors.New("pool not initialized")
+	}
+
+	_, err := ipam.AcquireSpecificIP(ctx, poolInfo.Prefix.Cidr, address.Spec.Address)
+	if err != nil {
+		return err
+	}
+	log.Infof("IP %v has been claimed for pool %v", address.Spec.Address, pool.Name)
+
+	return nil
+}
+
+func GetIPAddress(ctx context.Context, ipClaim *v1beta1.IPAddressClaim) (*v1beta1.IPAddress, error) {
 	var ipAddrs []string
-	if ipamV4Prefix != nil {
-		ipAddr, err := ipam.AcquireIP(ctx, ipamV4Prefix.Cidr)
-		if err != nil {
-			return nil, err
-		}
-		ipAddrs = append(ipAddrs, fmt.Sprintf("%v/%v", ipAddr.IP.String(), ipamConfig.IpamConfig.Ipv4Prefix))
+
+	poolInfo := ipams[fmt.Sprintf("%v/%v", ipClaim.Namespace, ipClaim.Spec.PoolRef.Name)]
+	if poolInfo.IPPool == nil {
+		return nil, errors.New("pool not initialized")
 	}
 
-	if ipamV6Prefix != nil {
-		ipAddr, err := ipam.AcquireIP(ctx, ipamV6Prefix.Cidr)
-		if err != nil {
-			return nil, err
-		}
-		ipAddrs = append(ipAddrs, fmt.Sprintf("%v/%v", ipAddr.IP.String(), ipamConfig.IpamConfig.Ipv6Prefix))
+	ipAddr, err := ipam.AcquireIP(ctx, poolInfo.Prefix.Cidr)
+	if err != nil {
+		return nil, err
 	}
+	ipAddrs = append(ipAddrs, fmt.Sprintf("%v", ipAddr.IP.String()))
 
-	networkConfig := v1beta1.NetworkDeviceSpec{
-		DHCP4:         v1beta1.DisabledState,
-		DHCP6:         v1beta1.DisabledState,
-		Gateway4:      ipamConfig.IpamConfig.GatewayIPv4,
-		Gateway6:      ipamConfig.IpamConfig.GatewayIPv6,
-		IPAddrs:       ipAddrs,
-		Nameservers:   ipamConfig.IpamConfig.NameServer,
-		SearchDomains: nil,
+	ipAddress := v1beta1.IPAddress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ipClaim.GetName(),
+			Namespace: ipClaim.GetNamespace(),
+		},
+		Spec: v1beta1.IPAddressSpec{
+			Address: ipAddrs[0],
+			ClaimRef: &corev1.LocalObjectReference{
+				Name: ipClaim.GetName(),
+			},
+			Gateway: poolInfo.IPPool.Spec.Gateway,
+			PoolRef: &corev1.TypedLocalObjectReference{
+				Kind: "IPPool",
+				Name: ipClaim.Spec.PoolRef.Name,
+			},
+			Prefix: int64(poolInfo.IPPool.Spec.Prefix),
+		},
 	}
-	return &networkConfig, nil
+	ipClaim.Status.AddressRef = corev1.LocalObjectReference{
+		Name: ipAddress.Name,
+	}
+	return &ipAddress, nil
 }
 
-func ReleaseIPConfiguration(ctx context.Context, networkConfig *v1beta1.NetworkDeviceSpec) error {
-	if len(networkConfig.IPAddrs) == 0 {
-		return errors.New("no IP addresses associated with network config")
-	}
-
-	addresses := networkConfig.IPAddrs
-	if len(addresses) == 0 {
+func ReleaseIPConfiguration(ctx context.Context, ipAddr *v1beta1.IPAddress) error {
+	address := ipAddr.Spec.Address
+	if address == "" {
 		return errors.New("no IP addresses associated with the interface")
 	}
-	address := addresses[0]
+
+	log.Infof("Processing ipaddress %v", address)
 	parsedIP, err := netip.ParseAddr(address)
 	if err != nil {
 		return err
 	}
+	log.Infof("Converted Addr: %v", parsedIP)
+
+	poolInfo := ipams[fmt.Sprintf("%v/%v", ipAddr.Namespace, ipAddr.Spec.PoolRef.Name)]
 	ip := &goipam.IP{
 		IP:           parsedIP,
-		ParentPrefix: "",
+		ParentPrefix: poolInfo.Prefix.Cidr,
 	}
+	log.Info("Releasing IP from pool")
 	_, err = ipam.ReleaseIP(ctx, ip)
 	return err
 }

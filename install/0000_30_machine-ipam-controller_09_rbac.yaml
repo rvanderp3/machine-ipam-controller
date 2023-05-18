@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: machine-ipam-controller
+  namespace: openshift-machine-api
+  annotations:
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: machine-ipam-controller
+  annotations:
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+rules:
+  - apiGroups:
+      - ipamcontroller.openshift.io
+    resources:
+      - ippools
+    verbs:
+      - get
+      - list
+      - patch
+      - watch
+  - apiGroups:
+      - machine.openshift.io
+    resources:
+      - ipaddressclaims
+      - ipaddressclaims/status
+    verbs:
+      - get
+      - list
+      - patch
+      - watch
+  - apiGroups:
+      - machine.openshift.io
+    resources:
+      - ipaddresses
+    verbs:
+      - create
+      - delete
+      - list
+      - patch
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: machine-ipam-controller
+  annotations:
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: machine-ipam-controller
+subjects:
+  - kind: ServiceAccount
+    name: machine-ipam-controller
+    namespace: openshift-machine-api

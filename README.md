@@ -5,13 +5,14 @@ An example of a controller which decorates machine resources with
 nmstate state data.  
 
 ## What does it do?
-This controller watches machines and checks for the presence of a 
-`preCreate` lifecycle hook.  If present, the controller will request 
-an IP address from IPAM, generate nmstate and decorate the machine 
-resource, remove the `preCreate` hook, and add a `preTerminate` hook. 
-When the machine is deleted, the controller watches for the `preTerminate`
-hook and releases the IP address associated with a machine that is to be 
-deleted.
+This controller manages IPPools that are referenced by IPAddressClaims. 
+When an IPAddressClaim is created, this controller will validate that the
+claim contains a IPPoolRef that matches the kind `IPPool` and apigroup 
+`ipamcontroller.openshift.io`.  If the claim is a match, the controller
+will then verify that an IPPool with the specified name exists.  If the
+pool is found, the controller will request an IP from the IPPool, create
+an IPAddress for the assigned IP and update the `IPAddressClaim`'s status
+to have a reference to the created `IPAddress`.
 
 ## Why does this even exist?
 This project intends to provide a prototype of the concepts discussed in
@@ -20,37 +21,30 @@ https://github.com/rvanderp3/enhancements/tree/static-ip-addresses-vsphere .
 For details on building the installer and machine API changes, see [DEV.md](./DEV.md).
 
 ## How do I configure it?
-Create a file called `ipam-config.yaml`.  This file defines the basics 
-of forming nmstate for machines.
+Create a file called `ipam-config.yaml`.  This file defines the IP addresses for the
+pool.
 
 ~~~yaml
-ipam-config:
-  ipv4-range-cidr: 192.168.101.64/28
-  ipv4-prefix: 23
-  ipv6-range-cidr: 2001::2/64
-  ipv6-prefix: 64
+apiVersion: ipamcontroller.openshift.io/v1
+kind: IPPool
+metadata:
+  name: testpool
+spec:
+  address-cidr: 192.168.101.248/29
+  prefix: 23
+  gateway: 192.168.100.1
   nameserver:
-    - 192.168.1.215
-  ipv4-gateway: 192.168.100.1
-  ipv6-gateway: 2001::100
-  lifecycle-hook:
-    name: ipamController
-    owner: network-admin
+    - 8.8.8.8
 ~~~
 
-Most parameters are self-explanatory, `lifecycle-hook` defines the lifecycle
-hook associated with this controller.  IPv4 and/or IPv6 addreses may be provisioned
-by the controller.  To disable IPv4 or IPv6, comment out the related fields in the 
-configuration.  
+Most parameters are self-explanatory.  `address-cidr` defines the grouping of IP 
+address for the pool to maintain.   `prefix` defines the prefix for the subnet.
 
 Note: Be careful when configuring gateways in dual stack configurations.  Enabling 
 gateways for both IPv4 and IPv6 may have undesired effects depending on which gateway
 provides connectivity to external networks.
 
-`machinesets` which should have static IPs applied should be annotated with 
-`preProvision` lifecycle hook matching the hook that is defined here.
-
-For example:
+To define the IPAddressClaim in the Machineset, you can follow the following example:
 ~~~yaml
 apiVersion: machine.openshift.io/v1beta1
 kind: MachineSet
@@ -73,10 +67,6 @@ spec:
         machine.openshift.io/cluster-api-machine-type: worker
         machine.openshift.io/cluster-api-machineset: static-machineset-worker
     spec:
-      lifecycleHooks:
-        preCreate:
-          - name: ipamController
-            owner: network-admin
       metadata: {}
       providerSpec:
         value:
@@ -90,7 +80,12 @@ spec:
             name: vsphere-cloud-credentials
           network:
             devices:
-              - networkName: lab
+              - addressesFromPool:
+                  - apiGroup: ipamcontroller.openshift.io
+                    kind: IPPool
+                    name: testpool
+                nameserver: 192.168.1.215
+                networkName: lab
           metadata:
             creationTimestamp: null
           numCPUs: 4
@@ -105,7 +100,8 @@ spec:
           apiVersion: machine.openshift.io/v1beta1
 ~~~
 
-As the `machineset` is scaled, `machines` are created with the `preCreate` lifecycle hook.
+As the `machineset` is scaled, `machines` are created with the `addressFromPool` 
+which will be a reference to the IPPool to get an IP address from.
 
 ## How do I build it?
 
