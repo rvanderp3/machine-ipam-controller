@@ -5,7 +5,7 @@ metadata:
   namespace: openshift-machine-api
 spec:
   containers:
-  - image: docker.io/vr4manta/machine-ipam-controller:latest
+  - image: quay.io/ocp-splat/machine-ipam-controller:latest
     imagePullPolicy: Always
     name: machine-ipam-controller
     resources:
