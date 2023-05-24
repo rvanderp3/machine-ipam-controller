@@ -7,11 +7,11 @@ import (
 	"strings"
 	"sync"
 
-	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	osclientset "github.com/openshift/client-go/config/clientset/versioned"
 	mapiclientset "github.com/openshift/client-go/machine/clientset/versioned"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/types"
+	ipamv1 "sigs.k8s.io/cluster-api/exp/ipam/api/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -41,12 +41,12 @@ func main() {
 	mapiclientset.NewForConfig(config.GetConfigOrDie())
 
 	// Register object scheme to allow deserialization
-	machinev1beta1.AddToScheme(mgr.GetScheme())
+	ipamv1.AddToScheme(mgr.GetScheme())
 	ipamcontrollerv1.AddToScheme(mgr.GetScheme())
 
 	err = builder.
 		ControllerManagedBy(mgr). // Create the ControllerManagedBy
-		For(&machinev1beta1.IPAddressClaim{}).
+		For(&ipamv1.IPAddressClaim{}).
 		Complete(&IPPoolClaimProcessor{})
 	if err != nil {
 		log.Error(err, "could not create claim processor")
@@ -76,7 +76,7 @@ type IPPoolController struct {
 	client.Client
 }
 
-func (a *IPPoolClaimProcessor) BindClaim(ctx context.Context, ipAddressClaim *machinev1beta1.IPAddressClaim) error {
+func (a *IPPoolClaimProcessor) BindClaim(ctx context.Context, ipAddressClaim *ipamv1.IPAddressClaim) error {
 	log.Info("Received BindClaim")
 	ip, err := mgmt.GetIPAddress(ctx, ipAddressClaim)
 	if err != nil {
@@ -103,7 +103,7 @@ func (a *IPPoolClaimProcessor) BindClaim(ctx context.Context, ipAddressClaim *ma
 
 func (a *IPPoolClaimProcessor) ReleaseClaim(ctx context.Context, namespacedName types.NamespacedName) error {
 	log.Info("Received ReleaseClaim")
-	ipAddress := &machinev1beta1.IPAddress{}
+	ipAddress := &ipamv1.IPAddress{}
 	if err := a.Get(ctx, namespacedName, ipAddress); err != nil {
 		return err
 	}
@@ -123,7 +123,7 @@ func (a *IPPoolClaimProcessor) Reconcile(ctx context.Context, req reconcile.Requ
 
 	log.Infof("Received request %v", req)
 
-	ipAddressClaim := &machinev1beta1.IPAddressClaim{}
+	ipAddressClaim := &ipamv1.IPAddressClaim{}
 	if err := a.Get(ctx, req.NamespacedName, ipAddressClaim); err != nil {
 		log.Warnf("Got error: %v", err)
 		if strings.Contains(fmt.Sprintf("%v%", err), "not found") {
@@ -171,7 +171,7 @@ func (a *IPPoolController) LoadPool(ctx context.Context, pool *ipamcontrollerv1.
 		options := client.ListOptions{
 			Namespace: pool.Namespace,
 		}
-		ipList := machinev1beta1.IPAddressList{}
+		ipList := ipamv1.IPAddressList{}
 		err = a.List(ctx, &ipList, &options)
 		for _, ip := range ipList.Items {
 			if ip.Spec.PoolRef.Name == pool.Name {
@@ -190,7 +190,7 @@ func (a *IPPoolController) LoadPool(ctx context.Context, pool *ipamcontrollerv1.
 
 func (a *IPPoolController) RemovePool(ctx context.Context, pool string) error {
 	log.Infof("Removing pool %v", pool)
-	ipAddresses := &machinev1beta1.IPAddressList{}
+	ipAddresses := &ipamv1.IPAddressList{}
 	err := a.Client.List(ctx, ipAddresses)
 	if err != nil {
 		log.Warnf("Unable to get IPAddresses: %v", err)
