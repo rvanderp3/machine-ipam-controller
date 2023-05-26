@@ -1,0 +1,234 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: machine-ipam-controller
+  namespace: openshift-machine-api
+  annotations:
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: machine-ipam-controller
+  annotations:
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+rules:
+  - apiGroups:
+      - ipamcontroller.openshift.io
+    resources:
+      - ippools
+    verbs:
+      - get
+      - list
+      - patch
+      - watch
+  - apiGroups:
+      - ipam.cluster.x-k8s.io
+    resources:
+      - ipaddressclaims
+      - ipaddressclaims/status
+    verbs:
+      - get
+      - list
+      - patch
+      - watch
+  - apiGroups:
+      - ipam.cluster.x-k8s.io
+    resources:
+      - ipaddresses
+    verbs:
+      - create
+      - delete
+      - list
+      - patch
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: machine-ipam-controller
+  annotations:
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: machine-ipam-controller
+subjects:
+  - kind: ServiceAccount
+    name: machine-ipam-controller
+    namespace: openshift-machine-api
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.10.0
+  creationTimestamp: null
+  name: ippools.ipamcontroller.openshift.io
+spec:
+  group: ipamcontroller.openshift.io
+  names:
+    kind: IPPool
+    listKind: IPPoolList
+    plural: ippools
+    singular: ippool
+  scope: Namespaced
+  versions:
+    - additionalPrinterColumns:
+        - jsonPath: .spec.address-cidr
+          name: CIDR
+          type: string
+        - jsonPath: .spec.prefix
+          name: Prefix
+          type: integer
+        - jsonPath: .spec.gateway
+          name: Gateway
+          type: string
+        - jsonPath: .metadata.creationTimestamp
+          name: Age
+          type: date
+      name: v1
+      schema:
+        openAPIV3Schema:
+          description: IPPool represents the IPPool definition for static IPs used by
+            the IPAM controller
+          properties:
+            apiVersion:
+              description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              type: string
+            kind:
+              description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: IPPoolSpec is the spec for an IPPool
+              properties:
+                address-cidr:
+                  description: AddressCidr is a cidr for the IP IPv4range to manage.
+                  type: string
+                gateway:
+                  type: string
+                nameserver:
+                  items:
+                    type: string
+                  type: array
+                prefix:
+                  description: Prefix is the subnet prefix
+                  type: integer
+              required:
+                - address-cidr
+                - prefix
+              type: object
+          required:
+            - spec
+          type: object
+      served: true
+      storage: true
+      subresources: {}
+---
+apiVersion: ipamcontroller.openshift.io/v1
+kind: IPPool
+metadata:
+  name: testpool
+spec:
+  address-cidr: 192.168.${third_octet}.128/29
+  prefix: 24
+  gateway: 192.168.${third_octet}.1 (edited)
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    api: clusterapi
+    k8s-app: machine-ipam-controller
+  name: machine-ipam-controllers
+  namespace: openshift-machine-api
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 0
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      api: clusterapi
+      k8s-app: machine-ipam-controller
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      name: machine-ipam-controller
+      namespace: openshift-machine-api
+      labels:
+        api: clusterapi
+        k8s-app: machine-ipam-controller
+    spec:
+      containers:
+        - image: quay.io/ocp-splat/machine-ipam-controller:latest
+          imagePullPolicy: Always
+          name: machine-ipam-controller
+          resources:
+            requests:
+              cpu: 10m
+              memory: 100Mi
+          volumeMounts:
+            - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              name: kube-api-access-8tcfz
+              readOnly: true
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+      restartPolicy: Always
+      serviceAccount: machine-ipam-controller
+      serviceAccountName: machine-ipam-controller
+      # terminationGracePeriodSeconds: 30
+      tolerations:
+        - key: CriticalAddonsOnly
+          operator: Exists
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/master
+          operator: Exists
+        - effect: NoExecute
+          key: node.kubernetes.io/not-ready
+          operator: Exists
+          tolerationSeconds: 300
+        - effect: NoExecute
+          key: node.kubernetes.io/unreachable
+          operator: Exists
+          tolerationSeconds: 300
+        - effect: NoSchedule
+          key: node.kubernetes.io/memory-pressure
+          operator: Exists
+      volumes:
+        - name: kube-api-access-8tcfz
+          projected:
+            defaultMode: 420
+            sources:
+              - serviceAccountToken:
+                  expirationSeconds: 3607
+                  path: token
+              - configMap:
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+                  name: kube-root-ca.crt
+              - downwardAPI:
+                  items:
+                    - fieldRef:
+                        apiVersion: v1
+                        fieldPath: metadata.namespace
+                      path: namespace
+              - configMap:
+                  items:
+                    - key: service-ca.crt
+                      path: service-ca.crt
+                  name: openshift-service-ca.crt
