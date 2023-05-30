@@ -566,8 +566,8 @@ github.com/rogpeppe/fastuuid v1.2.0/go.mod h1:jVj6XXZzXRy/MSR5jhDC/2q6DgLz+nrA6L
 github.com/rogpeppe/go-internal v1.3.0/go.mod h1:M8bDsm7K2OlrFYOpmOWEs/qY81heoFRclV5y23lUDJ4=
 github.com/rogpeppe/go-internal v1.9.0 h1:73kH8U+JUqXU8lRuOHeVHaa/SZPifC7BkcraZVejAe8=
 github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
-github.com/rvanderp3/api v0.0.0-20230425185222-828ab2f6180c h1:enK3tHw8P6+eZUMlrVz1tTyhKCd8rF2tBBK2a28uvt8=
-github.com/rvanderp3/api v0.0.0-20230425185222-828ab2f6180c/go.mod h1:ctXNyWanKEjGj8sss1KjjHQ3ENKFm33FFnS5BKaIPh4=
+github.com/rvanderp3/api v0.0.0-20230526210241-440393dddf06 h1:w3a4tkdaQd1kxRw2IwIb0P2aRUnju/NlB9Cwma9TE1s=
+github.com/rvanderp3/api v0.0.0-20230526210241-440393dddf06/go.mod h1:ctXNyWanKEjGj8sss1KjjHQ3ENKFm33FFnS5BKaIPh4=
 github.com/ryancurrah/gomodguard v1.3.0 h1:q15RT/pd6UggBXVBuLps8BXRvl5GPBcwVA7BJHMLuTw=
 github.com/ryancurrah/gomodguard v1.3.0/go.mod h1:ggBxb3luypPEzqVtq33ee7YSN35V28XeGnid8dnni50=
 github.com/ryanrolds/sqlclosecheck v0.4.0 h1:i8SX60Rppc1wRuyQjMciLqIzV3xnoHB7/tXbr6RGYNI=
