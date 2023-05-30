@@ -6,7 +6,6 @@ require (
 	github.com/daixiang0/gci v0.10.1
 	github.com/golangci/golangci-lint v1.52.2
 	github.com/metal-stack/go-ipam v1.11.2
-	github.com/openshift/api v0.0.0-20221019134313-013a7b8bf9b3
 	github.com/openshift/client-go v0.0.0-20220915152853-9dfefb19db2e
 	github.com/sirupsen/logrus v1.9.0
 	k8s.io/api v0.26.1
@@ -151,6 +150,7 @@ require (
 	github.com/nishanths/predeclared v0.2.2 // indirect
 	github.com/nunnatsa/ginkgolinter v0.9.0 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
+	github.com/openshift/api v0.0.0-20221019134313-013a7b8bf9b3 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.6 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
@@ -249,4 +249,4 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
-replace github.com/openshift/api => github.com/rvanderp3/api v0.0.0-20230425185222-828ab2f6180c
+replace github.com/openshift/api => github.com/rvanderp3/api v0.0.0-20230526210241-440393dddf06

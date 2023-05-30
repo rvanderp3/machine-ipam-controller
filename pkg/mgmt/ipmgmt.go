@@ -93,7 +93,7 @@ func GetIPAddress(ctx context.Context, ipClaim *ipamv1.IPAddressClaim) (*ipamv1.
 		return nil, err
 	}
 	ipAddrs = append(ipAddrs, fmt.Sprintf("%v", ipAddr.IP.String()))
-
+	apiGroup := "ipamcontroller.openshift.io"
 	ipAddress := ipamv1.IPAddress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ipClaim.GetName(),
@@ -106,8 +106,9 @@ func GetIPAddress(ctx context.Context, ipClaim *ipamv1.IPAddressClaim) (*ipamv1.
 			},
 			Gateway: poolInfo.IPPool.Spec.Gateway,
 			PoolRef: corev1.TypedLocalObjectReference{
-				Kind: "IPPool",
-				Name: ipClaim.Spec.PoolRef.Name,
+				APIGroup: &apiGroup,
+				Kind:     "IPPool",
+				Name:     ipClaim.Spec.PoolRef.Name,
 			},
 			Prefix: poolInfo.IPPool.Spec.Prefix,
 		},
