@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/pkg/errors"
 	"os"
 	"strings"
 	"sync"
@@ -88,6 +89,11 @@ func (a *IPPoolClaimProcessor) BindClaim(ctx context.Context, ipAddressClaim *ip
 	// create ipaddress object
 	if err = a.Client.Create(ctx, ip); err != nil {
 		log.Errorf("Unable to create IPAddress: %v", err)
+		err2 := mgmt.ReleaseIPConfiguration(ctx, ip)
+		if err2 != nil {
+			log.Errorf("Unable to release IPAddress: %v", err2)
+			return errors.Wrap(err, "Unable to release IPAddress")
+		}
 		return err
 	}
 
