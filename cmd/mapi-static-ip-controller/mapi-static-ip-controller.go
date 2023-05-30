@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 	"os"
 	"strings"
 	"sync"
@@ -96,8 +97,11 @@ func (a *IPPoolClaimProcessor) BindClaim(ctx context.Context, ipAddressClaim *ip
 		}
 		return err
 	}
-
-	// Update status
+	ipAddressClaim.Status = ipamv1.IPAddressClaimStatus{
+		AddressRef: corev1.LocalObjectReference{
+			Name: ip.ObjectMeta.Name,
+		},
+	}
 	if err = a.Client.Status().Update(ctx, ipAddressClaim); err != nil {
 		log.Errorf("Unable to update claim: %v", err)
 		return err

@@ -113,9 +113,7 @@ func GetIPAddress(ctx context.Context, ipClaim *ipamv1.IPAddressClaim) (*ipamv1.
 			Prefix: poolInfo.IPPool.Spec.Prefix,
 		},
 	}
-	ipClaim.Status.AddressRef = corev1.LocalObjectReference{
-		Name: ipAddress.Name,
-	}
+
 	return &ipAddress, nil
 }
 
