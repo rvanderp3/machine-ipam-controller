@@ -138,11 +138,12 @@ spec:
 apiVersion: ipamcontroller.openshift.io/v1
 kind: IPPool
 metadata:
+  namespace: openshift-machine-api
   name: testpool
 spec:
   address-cidr: 192.168.${third_octet}.128/29
   prefix: 24
-  gateway: 192.168.${third_octet}.1 (edited)
+  gateway: 192.168.${third_octet}.1
 ---
 apiVersion: apps/v1
 kind: Deployment
