@@ -81,9 +81,11 @@ spec:
           network:
             devices:
               - addressesFromPool:
-                  - apiGroup: ipamcontroller.openshift.io
-                    kind: IPPool
+                  - group: 'ipamcontroller.openshift.io'
                     name: testpool
+                    resource: 'IPPool'
+                nameservers:
+                  - 8.8.8.8
                 nameserver: 192.168.1.215
                 networkName: lab
           metadata:
