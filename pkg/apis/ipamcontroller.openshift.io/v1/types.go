@@ -24,6 +24,12 @@ type IPPool struct {
 
 	// +required
 	Spec IPPoolSpec `json:"spec"`
+
+	// status represents the current information/status for the IP pool.
+	// Populated by the system.
+	// Read-only.
+	// +optional
+	Status IPPoolStatus `json:"status,omitempty"`
 }
 
 // IPPoolSpec is the spec for an IPPool
@@ -39,6 +45,10 @@ type IPPoolSpec struct {
 
 	// +optional
 	Nameserver []string `json:"nameserver"`
+}
+
+// IPPoolStatus is the current status of an IPPool.
+type IPPoolStatus struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

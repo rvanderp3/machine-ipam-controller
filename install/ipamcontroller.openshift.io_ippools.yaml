@@ -65,6 +65,10 @@ spec:
             - address-cidr
             - prefix
             type: object
+          status:
+            description: status represents the current information/status for the
+              IP pool. Populated by the system. Read-only.
+            type: object
         required:
         - spec
         type: object
