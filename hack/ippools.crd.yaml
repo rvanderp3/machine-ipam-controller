@@ -1,3 +1,4 @@
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -14,54 +15,63 @@ spec:
     singular: ippool
   scope: Namespaced
   versions:
-    - additionalPrinterColumns:
-        - jsonPath: .spec.address-cidr
-          name: CIDR
-          type: string
-        - jsonPath: .spec.prefix
-          name: Prefix
-          type: integer
-        - jsonPath: .spec.gateway
-          name: Gateway
-          type: string
-        - jsonPath: .metadata.creationTimestamp
-          name: Age
-          type: date
-      name: v1
-      schema:
-        openAPIV3Schema:
-          description: IPPool represents the IPPool definition for static IPs used by the IPAM controller
-          properties:
-            apiVersion:
-              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
-              type: string
-            kind:
-              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
-              type: string
-            metadata:
-              type: object
-            spec:
-              description: IPPoolSpec is the spec for an IPPool
-              properties:
-                address-cidr:
-                  description: AddressCidr is a cidr for the IP IPv4range to manage.
+  - additionalPrinterColumns:
+    - jsonPath: .spec.address-cidr
+      name: CIDR
+      type: string
+    - jsonPath: .spec.prefix
+      name: Prefix
+      type: integer
+    - jsonPath: .spec.gateway
+      name: Gateway
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: IPPool represents the IPPool definition for static IPs used by
+          the IPAM controller
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: IPPoolSpec is the spec for an IPPool
+            properties:
+              address-cidr:
+                description: AddressCidr is a cidr for the IP IPv4range to manage.
+                type: string
+              gateway:
+                type: string
+              nameserver:
+                items:
                   type: string
-                gateway:
-                  type: string
-                nameserver:
-                  items:
-                    type: string
-                  type: array
-                prefix:
-                  description: Prefix is the subnet prefix
-                  type: integer
-              required:
-                - address-cidr
-                - prefix
-              type: object
-          required:
-            - spec
-          type: object
-      served: true
-      storage: true
-      subresources: {}
+                type: array
+              prefix:
+                description: Prefix is the subnet prefix
+                type: integer
+            required:
+            - address-cidr
+            - prefix
+            type: object
+          status:
+            description: status represents the current information/status for the
+              IP pool. Populated by the system. Read-only.
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources: {}
