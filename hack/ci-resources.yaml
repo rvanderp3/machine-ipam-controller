@@ -133,6 +133,7 @@ objects:
             - effect: NoSchedule
               key: node.kubernetes.io/memory-pressure
               operator: Exists
+          priorityClassName: openshift-user-critical
           volumes:
             - name: kube-api-access-8tcfz
               projected:
