@@ -11,6 +11,7 @@ const (
 
 // +genclient
 // +genclient:noStatus
+// +kubebuilder:subresource:status
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:printcolumn:name="CIDR",type=string,JSONPath=`.spec.address-cidr`
 // +kubebuilder:printcolumn:name="Prefix",type=integer,JSONPath=`.spec.prefix`
