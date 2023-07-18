@@ -92,6 +92,8 @@ objects:
         type: RollingUpdate
       template:
         metadata:
+          annotations:
+            target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
           name: machine-ipam-controller
           namespace: openshift-machine-api
           labels:
