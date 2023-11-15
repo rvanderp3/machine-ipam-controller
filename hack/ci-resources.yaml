@@ -67,7 +67,7 @@ objects:
       name: static-ci-pool
     spec:
       address-cidr: ${ADDRESS_CIDR}
-      prefix: ${PREFIX}
+      prefix: ${{PREFIX}}
       gateway: ${GATEWAY}
   - apiVersion: apps/v1
     kind: Deployment
