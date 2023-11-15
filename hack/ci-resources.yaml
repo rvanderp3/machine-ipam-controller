@@ -66,9 +66,9 @@ objects:
       namespace: openshift-machine-api
       name: static-ci-pool
     spec:
-      address-cidr: 192.168.${THIRD_OCTET}.128/29
-      prefix: 23
-      gateway: 192.168.${THIRD_OCTET}.1
+      address-cidr: ${ADDRESS_CIDR}
+      prefix: ${PREFIX}
+      gateway: ${GATEWAY}
   - apiVersion: apps/v1
     kind: Deployment
     metadata:
@@ -161,5 +161,9 @@ objects:
                           path: service-ca.crt
                       name: openshift-service-ca.crt
 parameters:
-  - name: THIRD_OCTET
-    description: The value used in the third octet of the IP cidr.
+  - name: ADDRESS_CIDR
+    description: The address-cidr value used in the IPPool spec.
+  - name: PREFIX
+    description: The prefix value used in the IPPool spec.
+  - name: GATEWAY
+    description: The gateway value used in the IPPool spec.
