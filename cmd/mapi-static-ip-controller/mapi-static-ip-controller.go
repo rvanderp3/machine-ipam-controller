@@ -3,17 +3,18 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/pkg/errors"
-	corev1 "k8s.io/api/core/v1"
 	"os"
 	"strings"
 	"sync"
+
+	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 
 	osclientset "github.com/openshift/client-go/config/clientset/versioned"
 	mapiclientset "github.com/openshift/client-go/machine/clientset/versioned"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/types"
-	ipamv1 "sigs.k8s.io/cluster-api/exp/ipam/api/v1alpha1"
+	ipamv1 "sigs.k8s.io/cluster-api/exp/ipam/api/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
