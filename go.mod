@@ -1,6 +1,6 @@
-module github.com/rvanderp3/machine-ipam-controller
+module github.com/openshift-splat-team/machine-ipam-controller
 
-go 1.18
+go 1.20
 
 require (
 	github.com/daixiang0/gci v0.10.1
@@ -150,7 +150,7 @@ require (
 	github.com/nishanths/predeclared v0.2.2 // indirect
 	github.com/nunnatsa/ginkgolinter v0.9.0 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
-	github.com/openshift/api v0.0.0-20221019134313-013a7b8bf9b3 // indirect
+	github.com/openshift/api v0.0.0-20231211194045-2679f634dcf6 // indirect
 	github.com/pelletier/go-toml/v2 v2.1.0 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/polyfloyd/go-errorlint v1.4.0 // indirect
@@ -251,5 +251,3 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
-
-replace github.com/openshift/api => github.com/rvanderp3/api v0.0.0-20230526210241-440393dddf06

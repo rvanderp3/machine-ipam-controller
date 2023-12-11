@@ -20,6 +20,9 @@ const (
 	// cluster to which it belongs.
 	MachineClusterIDLabel = "machine.openshift.io/cluster-api-cluster"
 
+	// IPClaimProtectionFinalizer is placed on an IPAddressClaim by the machine reconciler
+	// when an IPAddressClaim associated with a machine is created. This finalizer is removed
+	// from the IPAddressClaim when the associated machine is deleted.
 	IPClaimProtectionFinalizer = "machine.openshift.io/ip-claim-protection"
 )
 

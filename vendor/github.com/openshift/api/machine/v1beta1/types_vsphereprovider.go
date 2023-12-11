@@ -87,124 +87,83 @@ type NetworkSpec struct {
 	Devices []NetworkDeviceSpec `json:"devices"`
 }
 
-type DHCPState string
-
-const (
-	EnabledState  DHCPState = "Enabled"
-	DisabledState DHCPState = "Disabled"
-)
-
 // AddressesFromPool is an IPAddressPool that will be used to create
 // IPAddressClaims for fulfillment by an external controller.
 type AddressesFromPool struct {
+	// group of the IP address pool type known to an external IPAM controller.
+	// This should be a fully qualified domain name, for example, externalipam.controller.io.
+	// +kubebuilder:example=externalipam.controller.io
+	// +kubebuilder:validation:Pattern:="^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"
+	// +kubebuilder:validation:Required
 	Group string `json:"group"`
-
-	// Kind is the type of resource being referenced
+	// resource of the IP address pool type known to an external IPAM controller.
+	// It is normally the plural form of the resource kind in lowercase, for example,
+	// ippools.
+	// +kubebuilder:example=ippools
+	// +kubebuilder:validation:Pattern:="^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+	// +kubebuilder:validation:Required
 	Resource string `json:"resource"`
-
-	// Name is the name of resource being referenced
+	// name of an IP address pool, for example, pool-config-1.
+	// +kubebuilder:example=pool-config-1
+	// +kubebuilder:validation:Pattern:="^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 }
 
 // NetworkDeviceSpec defines the network configuration for a virtual machine's
 // network device.
 type NetworkDeviceSpec struct {
-	// NetworkName is the name of the vSphere network to which the device
-	// will be connected.
+	// networkName is the name of the vSphere network or port group to which the network
+	// device will be connected, for example, port-group-1. When not provided, the vCenter
+	// API will attempt to select a default network.
+	// The available networks (port groups) can be listed using `govc ls 'network/*'`
+	// +kubebuilder:example=port-group-1
+	// +kubebuilder:validation:MaxLength=80
 	// +optional
 	NetworkName string `json:"networkName,omitempty"`
 
-	// DeviceName may be used to explicitly assign a name to the network device
-	// as it exists in the guest operating system.
-	// +optional
-	DeviceName string `json:"deviceName,omitempty"`
-
-	// DHCP4 is a flag that indicates whether or not to use DHCP for IPv4
-	// on this device.
-	// If enabled, then IPAddrs should not contain any IPv4 addresses and
-	// AddressesFromPools must be empty.
-	// +optional
-	// +kubebuilder:default=Enabled
-	// +kubebuilder:validation:Enum=Enabled;Disabled
-	DHCP4 DHCPState `json:"dhcp4,omitempty"`
-
-	// DHCP6 is a flag that indicates whether or not to use DHCP for IPv6
-	// on this device.
-	// If enabled, then IPAddrs should not contain any IPv6 addresses and
-	// AddressesFromPools must be empty.
-	// +optional
-	// +kubebuilder:default=Enabled
-	// +kubebuilder:validation:Enum=Enabled;Disabled
-	DHCP6 DHCPState `json:"dhcp6,omitempty"`
-
-	// Gateway4 is the IPv4 gateway used by this device.
-	// Required when DHCP4 is false.
-	// +optional
+	// gateway is an IPv4 or IPv6 address which represents the subnet gateway,
+	// for example, 192.168.1.1.
 	// +kubebuilder:validation:Format=ipv4
-	Gateway4 string `json:"gateway4,omitempty"`
-
-	// Gateway4 is the IPv4 gateway used by this device.
-	// Required when DHCP6 is false.
 	// +kubebuilder:validation:Format=ipv6
+	// +kubebuilder:example=192.168.1.1
+	// +kubebuilder:example=2001:DB8:0000:0000:244:17FF:FEB6:D37D
 	// +optional
-	Gateway6 string `json:"gateway6,omitempty"`
+	Gateway string `json:"gateway,omitempty"`
 
-	// IPAddrs is a list of one or more IPv4 and/or IPv6 addresses and CIDR to assign
-	// to this device.  For example: 192.168.1.100/24
-	// Required when DHCP4 and DHCP6 are both Disabled.
+	// ipAddrs is a list of one or more IPv4 and/or IPv6 addresses and CIDR to assign to
+	// this device, for example, 192.168.1.100/24. IP addresses provided via ipAddrs are
+	// intended to allow explicit assignment of a machine's IP address. IP pool configurations
+	// provided via addressesFromPool, however, defer IP address assignment to an external controller.
+	// If both addressesFromPool and ipAddrs are empty or not defined, DHCP will be used to assign
+	// an IP address. If both ipAddrs and addressesFromPools are defined, the IP addresses associated with
+	// ipAddrs will be applied first followed by IP addresses from addressesFromPools.
+	// +kubebuilder:validation:Format=ipv4
+	// +kubebuilder:validation:Format=ipv6
+	// +kubebuilder:example=192.168.1.100/24
+	// +kubebuilder:example=2001:DB8:0000:0000:244:17FF:FEB6:D37D/64
 	// +optional
 	IPAddrs []string `json:"ipAddrs,omitempty"`
 
-	// MTU is the device’s Maximum Transmission Unit size in bytes.
-	// https://www.rfc-editor.org/rfc/rfc791
-	// +optional
-	// +kubebuilder:validation:Minimum=576
-	// +kubebuilder:validation:Maximum=9000
-	// +kubebuilder:validation:Default=1500
-	MTU int32 `json:"mtu,omitempty"`
-
-	// MACAddr is the MAC address used by this device.
-	// It is generally a good idea to omit this field and allow a MAC address
-	// to be generated.
-	// Please note that this value must use the VMware OUI to work with the
-	// in-tree vSphere cloud provider.
-	// +kubebuilder:validation:Pattern=`^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$`
-	// +optional
-	MACAddr string `json:"macAddr,omitempty"`
-
-	// Nameservers is a list of IPv4 and/or IPv6 addresses used as DNS
-	// nameservers.
-	// Please note that Linux allows only three nameservers (https://linux.die.net/man/5/resolv.conf).
+	// nameservers is a list of IPv4 and/or IPv6 addresses used as DNS nameservers, for example,
+	// 8.8.8.8. a nameserver is not provided by a fulfilled IPAddressClaim. If DHCP is not the
+	// source of IP addresses for this network device, nameservers should include a valid nameserver.
+	// +kubebuilder:validation:Format=ipv4
+	// +kubebuilder:validation:Format=ipv6
+	// +kubebuilder:example=8.8.8.8
 	// +optional
 	Nameservers []string `json:"nameservers,omitempty"`
 
-	// Routes is a list of optional, static routes applied to the device.
-	// +optional
-	Routes []NetworkRouteSpec `json:"routes,omitempty"`
-
-	// SearchDomains is a list of search domains used when resolving IP
-	// addresses with DNS.
-	// +optional
-	SearchDomains []string `json:"searchDomains,omitempty"`
-
-	// AddressesFromPools is a list of references to IP pool types and instances
-	// which are handled by an external controller.  The external controller
-	// will assign IP addresses in accordance with the IP pool instances.
-	AddressesFromPools []AddressesFromPool `json:"addressesFromPool,omitempty"`
-}
-
-// NetworkRouteSpec defines a static network route.
-type NetworkRouteSpec struct {
-	// To is an IPv4 or IPv6 address of the target network.
-	// +kubebuilder:validation:Format=ipv4
-	To string `json:"to"`
-	// Via is the IPv4 or IPv6 address of the gateway.
+	// addressesFromPools is a list of references to IP pool types and instances which are handled
+	// by an external controller. addressesFromPool configurations provided via addressesFromPools
+	// defer IP address assignment to an external controller. IP addresses provided via ipAddrs,
+	// however, are intended to allow explicit assignment of a machine's IP address. If both
+	// addressesFromPool and ipAddrs are empty or not defined, DHCP will assign an IP address.
+	// If both ipAddrs and addressesFromPools are defined, the IP addresses associated with
+	// ipAddrs will be applied first followed by IP addresses from addressesFromPools.
 	// +kubebuilder:validation:Format=ipv4
 	// +optional
-	Via string `json:"via"`
-	// Metric is the weight/priority of the route.
-	// +optional
-	Metric int32 `json:"metric"`
+	AddressesFromPools []AddressesFromPool `json:"addressesFromPools,omitempty"`
 }
 
 // WorkspaceConfig defines a workspace configuration for the vSphere cloud

@@ -30,6 +30,7 @@ var map_AWSMachineProviderConfig = map[string]string{
 	"blockDevices":           "BlockDevices is the set of block device mapping associated to this instance, block device without a name will be used as a root device and only one device without a name is allowed https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/block-device-mapping-concepts.html",
 	"spotMarketOptions":      "SpotMarketOptions allows users to configure instances to be run using AWS Spot instances.",
 	"metadataServiceOptions": "MetadataServiceOptions allows users to configure instance metadata service interaction options. If nothing specified, default AWS IMDS settings will be applied. https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_InstanceMetadataOptionsRequest.html",
+	"placementGroupName":     "PlacementGroupName specifies the name of the placement group in which to launch the instance. The placement group must already be created and may use any placement strategy. When omitted, no placement group is used when creating the EC2 instance.",
 }
 
 func (AWSMachineProviderConfig) SwaggerDoc() map[string]string {
@@ -223,6 +224,15 @@ func (AzureMachineProviderStatus) SwaggerDoc() map[string]string {
 	return map_AzureMachineProviderStatus
 }
 
+var map_ConfidentialVM = map[string]string{
+	"":             "ConfidentialVM defines the UEFI settings for the virtual machine.",
+	"uefiSettings": "uefiSettings specifies the security settings like secure boot and vTPM used while creating the virtual machine.",
+}
+
+func (ConfidentialVM) SwaggerDoc() map[string]string {
+	return map_ConfidentialVM
+}
+
 var map_DataDisk = map[string]string{
 	"":               "DataDisk specifies the parameters that are used to add one or more data disks to the machine. A Data Disk is a managed disk that's attached to a virtual machine to store application data. It differs from an OS Disk as it doesn't come with a pre-installed OS, and it cannot contain the boot volume. It is registered as SCSI drive and labeled with the chosen `lun`. e.g. for `lun: 0` the raw disk device will be available at `/dev/disk/azure/scsi1/lun0`.\n\nAs the Data Disk disk device is attached raw to the virtual machine, it will need to be partitioned, formatted with a filesystem and mounted, in order for it to be usable. This can be done by creating a custom userdata Secret with custom Ignition configuration to achieve the desired initialization. At this stage the previously defined `lun` is to be used as the \"device\" key for referencing the raw disk device to be initialized. Once the custom userdata Secret has been created, it can be referenced in the Machine's `.providerSpec.userDataSecret`. For further guidance and examples, please refer to the official OpenShift docs.",
 	"nameSuffix":     "NameSuffix is the suffix to be appended to the machine name to generate the disk name. Each disk name will be in format <machineName>_<nameSuffix>. NameSuffix name must start and finish with an alphanumeric character and can only contain letters, numbers, underscores, periods or hyphens. The overall disk name must not exceed 80 chars in length.",
@@ -295,6 +305,7 @@ var map_OSDiskManagedDiskParameters = map[string]string{
 	"":                   "OSDiskManagedDiskParameters is the parameters of a OSDisk managed disk.",
 	"storageAccountType": "StorageAccountType is the storage account type to use. Possible values include \"Standard_LRS\", \"Premium_LRS\".",
 	"diskEncryptionSet":  "DiskEncryptionSet is the disk encryption set properties",
+	"securityProfile":    "securityProfile specifies the security profile for the managed disk.",
 }
 
 func (OSDiskManagedDiskParameters) SwaggerDoc() map[string]string {
@@ -303,11 +314,23 @@ func (OSDiskManagedDiskParameters) SwaggerDoc() map[string]string {
 
 var map_SecurityProfile = map[string]string{
 	"":                 "SecurityProfile specifies the Security profile settings for a virtual machine or virtual machine scale set.",
-	"encryptionAtHost": "This field indicates whether Host Encryption should be enabled or disabled for a virtual machine or virtual machine scale set. Default is disabled.",
+	"encryptionAtHost": "encryptionAtHost indicates whether Host Encryption should be enabled or disabled for a virtual machine or virtual machine scale set. This should be disabled when SecurityEncryptionType is set to DiskWithVMGuestState. Default is disabled.",
+	"settings":         "settings specify the security type and the UEFI settings of the virtual machine. This field can be set for Confidential VMs and Trusted Launch for VMs.",
 }
 
 func (SecurityProfile) SwaggerDoc() map[string]string {
 	return map_SecurityProfile
+}
+
+var map_SecuritySettings = map[string]string{
+	"":               "SecuritySettings define the security type and the UEFI settings of the virtual machine.",
+	"securityType":   "securityType specifies the SecurityType of the virtual machine. It has to be set to any specified value to enable UEFISettings. The default behavior is: UEFISettings will not be enabled unless this property is set.",
+	"confidentialVM": "confidentialVM specifies the security configuration of the virtual machine. For more information regarding Confidential VMs, please refer to: https://learn.microsoft.com/azure/confidential-computing/confidential-vm-overview",
+	"trustedLaunch":  "trustedLaunch specifies the security configuration of the virtual machine. For more information regarding TrustedLaunch for VMs, please refer to: https://learn.microsoft.com/azure/virtual-machines/trusted-launch",
+}
+
+func (SecuritySettings) SwaggerDoc() map[string]string {
+	return map_SecuritySettings
 }
 
 var map_SpotVMOptions = map[string]string{
@@ -317,6 +340,35 @@ var map_SpotVMOptions = map[string]string{
 
 func (SpotVMOptions) SwaggerDoc() map[string]string {
 	return map_SpotVMOptions
+}
+
+var map_TrustedLaunch = map[string]string{
+	"":             "TrustedLaunch defines the UEFI settings for the virtual machine.",
+	"uefiSettings": "uefiSettings specifies the security settings like secure boot and vTPM used while creating the virtual machine.",
+}
+
+func (TrustedLaunch) SwaggerDoc() map[string]string {
+	return map_TrustedLaunch
+}
+
+var map_UEFISettings = map[string]string{
+	"":                                 "UEFISettings specifies the security settings like secure boot and vTPM used while creating the virtual machine.",
+	"secureBoot":                       "secureBoot specifies whether secure boot should be enabled on the virtual machine. Secure Boot verifies the digital signature of all boot components and halts the boot process if signature verification fails. If omitted, the platform chooses a default, which is subject to change over time, currently that default is disabled.",
+	"virtualizedTrustedPlatformModule": "virtualizedTrustedPlatformModule specifies whether vTPM should be enabled on the virtual machine. When enabled the virtualized trusted platform module measurements are used to create a known good boot integrity policy baseline. The integrity policy baseline is used for comparison with measurements from subsequent VM boots to determine if anything has changed. This is required to be enabled if SecurityEncryptionType is defined. If omitted, the platform chooses a default, which is subject to change over time, currently that default is disabled.",
+}
+
+func (UEFISettings) SwaggerDoc() map[string]string {
+	return map_UEFISettings
+}
+
+var map_VMDiskSecurityProfile = map[string]string{
+	"":                       "VMDiskSecurityProfile specifies the security profile settings for the managed disk. It can be set only for Confidential VMs.",
+	"diskEncryptionSet":      "diskEncryptionSet specifies the customer managed disk encryption set resource id for the managed disk that is used for Customer Managed Key encrypted ConfidentialVM OS Disk and VMGuest blob.",
+	"securityEncryptionType": "securityEncryptionType specifies the encryption type of the managed disk. It is set to DiskWithVMGuestState to encrypt the managed disk along with the VMGuestState blob, and to VMGuestStateOnly to encrypt the VMGuestState blob only. When set to VMGuestStateOnly, the vTPM should be enabled. When set to DiskWithVMGuestState, both SecureBoot and vTPM should be enabled. If the above conditions are not fulfilled, the VM will not be created and the respective error will be returned. It can be set only for Confidential VMs. Confidential VMs are defined by their SecurityProfile.SecurityType being set to ConfidentialVM, the SecurityEncryptionType of their OS disk being set to one of the allowed values and by enabling the respective SecurityProfile.UEFISettings of the VM (i.e. vTPM and SecureBoot), depending on the selected SecurityEncryptionType. For further details on Azure Confidential VMs, please refer to the respective documentation: https://learn.microsoft.com/azure/confidential-computing/confidential-vm-overview",
+}
+
+func (VMDiskSecurityProfile) SwaggerDoc() map[string]string {
+	return map_VMDiskSecurityProfile
 }
 
 var map_GCPDisk = map[string]string{
@@ -678,8 +730,9 @@ func (ProviderSpec) SwaggerDoc() map[string]string {
 
 var map_AddressesFromPool = map[string]string{
 	"":         "AddressesFromPool is an IPAddressPool that will be used to create IPAddressClaims for fulfillment by an external controller.",
-	"resource": "Kind is the type of resource being referenced",
-	"name":     "Name is the name of resource being referenced",
+	"group":    "group of the IP address pool type known to an external IPAM controller. This should be a fully qualified domain name, for example, externalipam.controller.io.",
+	"resource": "resource of the IP address pool type known to an external IPAM controller. It is normally the plural form of the resource kind in lowercase, for example, ippools.",
+	"name":     "name of an IP address pool, for example, pool-config-1.",
 }
 
 func (AddressesFromPool) SwaggerDoc() map[string]string {
@@ -687,35 +740,16 @@ func (AddressesFromPool) SwaggerDoc() map[string]string {
 }
 
 var map_NetworkDeviceSpec = map[string]string{
-	"":                  "NetworkDeviceSpec defines the network configuration for a virtual machine's network device.",
-	"networkName":       "NetworkName is the name of the vSphere network to which the device will be connected.",
-	"deviceName":        "DeviceName may be used to explicitly assign a name to the network device as it exists in the guest operating system.",
-	"dhcp4":             "DHCP4 is a flag that indicates whether or not to use DHCP for IPv4 on this device. If enabled, then IPAddrs should not contain any IPv4 addresses and AddressesFromPools must be empty.",
-	"dhcp6":             "DHCP6 is a flag that indicates whether or not to use DHCP for IPv6 on this device. If enabled, then IPAddrs should not contain any IPv6 addresses and AddressesFromPools must be empty.",
-	"gateway4":          "Gateway4 is the IPv4 gateway used by this device. Required when DHCP4 is false.",
-	"gateway6":          "Gateway4 is the IPv4 gateway used by this device. Required when DHCP6 is false.",
-	"ipAddrs":           "IPAddrs is a list of one or more IPv4 and/or IPv6 addresses and CIDR to assign to this device.  For example: 192.168.1.100/24 Required when DHCP4 and DHCP6 are both Disabled.",
-	"mtu":               "MTU is the device’s Maximum Transmission Unit size in bytes. https://www.rfc-editor.org/rfc/rfc791",
-	"macAddr":           "MACAddr is the MAC address used by this device. It is generally a good idea to omit this field and allow a MAC address to be generated. Please note that this value must use the VMware OUI to work with the in-tree vSphere cloud provider.",
-	"nameservers":       "Nameservers is a list of IPv4 and/or IPv6 addresses used as DNS nameservers. Please note that Linux allows only three nameservers (https://linux.die.net/man/5/resolv.conf).",
-	"routes":            "Routes is a list of optional, static routes applied to the device.",
-	"searchDomains":     "SearchDomains is a list of search domains used when resolving IP addresses with DNS.",
-	"addressesFromPool": "AddressesFromPools is a list of references to IP pool types and instances which are handled by an external controller.  The external controller will assign IP addresses in accordance with the IP pool instances.",
+	"":                   "NetworkDeviceSpec defines the network configuration for a virtual machine's network device.",
+	"networkName":        "networkName is the name of the vSphere network or port group to which the network device will be connected, for example, port-group-1. When not provided, the vCenter API will attempt to select a default network. The available networks (port groups) can be listed using `govc ls 'network/*'`",
+	"gateway":            "gateway is an IPv4 or IPv6 address which represents the subnet gateway, for example, 192.168.1.1.",
+	"ipAddrs":            "ipAddrs is a list of one or more IPv4 and/or IPv6 addresses and CIDR to assign to this device, for example, 192.168.1.100/24. IP addresses provided via ipAddrs are intended to allow explicit assignment of a machine's IP address. IP pool configurations provided via addressesFromPool, however, defer IP address assignment to an external controller. If both addressesFromPool and ipAddrs are empty or not defined, DHCP will be used to assign an IP address. If both ipAddrs and addressesFromPools are defined, the IP addresses associated with ipAddrs will be applied first followed by IP addresses from addressesFromPools.",
+	"nameservers":        "nameservers is a list of IPv4 and/or IPv6 addresses used as DNS nameservers, for example, 8.8.8.8. a nameserver is not provided by a fulfilled IPAddressClaim. If DHCP is not the source of IP addresses for this network device, nameservers should include a valid nameserver.",
+	"addressesFromPools": "addressesFromPools is a list of references to IP pool types and instances which are handled by an external controller. addressesFromPool configurations provided via addressesFromPools defer IP address assignment to an external controller. IP addresses provided via ipAddrs, however, are intended to allow explicit assignment of a machine's IP address. If both addressesFromPool and ipAddrs are empty or not defined, DHCP will assign an IP address. If both ipAddrs and addressesFromPools are defined, the IP addresses associated with ipAddrs will be applied first followed by IP addresses from addressesFromPools.",
 }
 
 func (NetworkDeviceSpec) SwaggerDoc() map[string]string {
 	return map_NetworkDeviceSpec
-}
-
-var map_NetworkRouteSpec = map[string]string{
-	"":       "NetworkRouteSpec defines a static network route.",
-	"to":     "To is an IPv4 or IPv6 address of the target network.",
-	"via":    "Via is the IPv4 or IPv6 address of the gateway.",
-	"metric": "Metric is the weight/priority of the route.",
-}
-
-func (NetworkRouteSpec) SwaggerDoc() map[string]string {
-	return map_NetworkRouteSpec
 }
 
 var map_NetworkSpec = map[string]string{
