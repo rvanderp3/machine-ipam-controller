@@ -9,8 +9,8 @@ if [ "$IS_CONTAINER" != "" ]; then
 else
   podman run --rm \
     --env IS_CONTAINER=TRUE \
-    --volume "${PWD}:/go/src/github.com/rvanderp3/machine-ipam-controller:z" \
-    --workdir /go/src/github.com/rvanderp3/machine-ipam-controller \
+    --volume "${PWD}:/go/src/github.com/openshift-splat-team/machine-ipam-controller:z" \
+    --workdir /go/src/github.com/openshift-splat-team/machine-ipam-controller \
     docker.io/golang:1.19 \
     ./hack/go-fmt.sh "${@}"
 fi

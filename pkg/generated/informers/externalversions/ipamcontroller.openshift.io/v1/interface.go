@@ -3,7 +3,7 @@
 package v1
 
 import (
-	internalinterfaces "github.com/rvanderp3/machine-ipam-controller/pkg/generated/informers/externalversions/internalinterfaces"
+	internalinterfaces "github.com/openshift-splat-team/machine-ipam-controller/pkg/generated/informers/externalversions/internalinterfaces"
 )
 
 // Interface provides access to all the informers in this group version.
