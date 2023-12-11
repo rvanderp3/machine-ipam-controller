@@ -6,8 +6,8 @@ import (
 	"context"
 	"time"
 
-	v1 "github.com/rvanderp3/machine-ipam-controller/pkg/apis/ipamcontroller.openshift.io/v1"
-	scheme "github.com/rvanderp3/machine-ipam-controller/pkg/generated/clientset/versioned/scheme"
+	v1 "github.com/openshift-splat-team/machine-ipam-controller/pkg/apis/ipamcontroller.openshift.io/v1"
+	scheme "github.com/openshift-splat-team/machine-ipam-controller/pkg/generated/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"

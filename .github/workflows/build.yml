@@ -20,7 +20,7 @@ jobs:
     - name: Go Mod
       run: go mod vendor
 #    - name: Build
-#      run: go build -v --mod=vendor -ldflags "-X github.com/rvanderp3/mapi-static-ip-controller/pkg/version.Raw=${{ vars.GITHUB_REF_NAME }} -X github.com/rvanderp3/mapi-static-ip-controller/pkg/version.Commit=${{ vars.GITHUB_SHA }}"  -o "bin/mapi-static-ip-controller" ./cmd/mapi-static-ip-controller
+#      run: go build -v --mod=vendor -ldflags "-X github.com/openshift-splat-team/mapi-static-ip-controller/pkg/version.Raw=${{ vars.GITHUB_REF_NAME }} -X github.com/openshift-splat-team/mapi-static-ip-controller/pkg/version.Commit=${{ vars.GITHUB_SHA }}"  -o "bin/mapi-static-ip-controller" ./cmd/mapi-static-ip-controller
     - name: Build Image
       id: build-image
       uses: redhat-actions/buildah-build@v2.12

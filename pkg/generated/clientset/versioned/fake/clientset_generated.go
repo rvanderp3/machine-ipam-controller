@@ -3,9 +3,9 @@
 package fake
 
 import (
-	clientset "github.com/rvanderp3/machine-ipam-controller/pkg/generated/clientset/versioned"
-	ipamcontrollerv1 "github.com/rvanderp3/machine-ipam-controller/pkg/generated/clientset/versioned/typed/ipamcontroller.openshift.io/v1"
-	fakeipamcontrollerv1 "github.com/rvanderp3/machine-ipam-controller/pkg/generated/clientset/versioned/typed/ipamcontroller.openshift.io/v1/fake"
+	clientset "github.com/openshift-splat-team/machine-ipam-controller/pkg/generated/clientset/versioned"
+	ipamcontrollerv1 "github.com/openshift-splat-team/machine-ipam-controller/pkg/generated/clientset/versioned/typed/ipamcontroller.openshift.io/v1"
+	fakeipamcontrollerv1 "github.com/openshift-splat-team/machine-ipam-controller/pkg/generated/clientset/versioned/typed/ipamcontroller.openshift.io/v1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"

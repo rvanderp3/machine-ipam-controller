@@ -7,9 +7,9 @@ import (
 	sync "sync"
 	time "time"
 
-	versioned "github.com/rvanderp3/machine-ipam-controller/pkg/generated/clientset/versioned"
-	internalinterfaces "github.com/rvanderp3/machine-ipam-controller/pkg/generated/informers/externalversions/internalinterfaces"
-	ipamcontrolleropenshiftio "github.com/rvanderp3/machine-ipam-controller/pkg/generated/informers/externalversions/ipamcontroller.openshift.io"
+	versioned "github.com/openshift-splat-team/machine-ipam-controller/pkg/generated/clientset/versioned"
+	internalinterfaces "github.com/openshift-splat-team/machine-ipam-controller/pkg/generated/informers/externalversions/internalinterfaces"
+	ipamcontrolleropenshiftio "github.com/openshift-splat-team/machine-ipam-controller/pkg/generated/informers/externalversions/ipamcontroller.openshift.io"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"

@@ -3,8 +3,8 @@
 package ipamcontroller
 
 import (
-	internalinterfaces "github.com/rvanderp3/machine-ipam-controller/pkg/generated/informers/externalversions/internalinterfaces"
-	v1 "github.com/rvanderp3/machine-ipam-controller/pkg/generated/informers/externalversions/ipamcontroller.openshift.io/v1"
+	internalinterfaces "github.com/openshift-splat-team/machine-ipam-controller/pkg/generated/informers/externalversions/internalinterfaces"
+	v1 "github.com/openshift-splat-team/machine-ipam-controller/pkg/generated/informers/externalversions/ipamcontroller.openshift.io/v1"
 )
 
 // Interface provides access to each of this group's versions.

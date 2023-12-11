@@ -31,7 +31,7 @@ curl https://patch-diff.githubusercontent.com/raw/openshift/installer/pull/6512.
 
 3. Update go.mod to use API extensions in [api#1338](https://github.com/openshift/api/pull/1338)
 ~~~go
-replace github.com/openshift/api => github.com/rvanderp3/api v0.0.0-20230320203849-e0ab19eba3b2
+replace github.com/openshift/api => github.com/openshift-splat-team/api v0.0.0-20230320203849-e0ab19eba3b2
 ~~~
 4. Revendor 
 ~~~sh
@@ -53,7 +53,7 @@ curl https://patch-diff.githubusercontent.com/raw/openshift/machine-api-operator
 
 3. Update go.mod to use API extensions in [api#1338](https://github.com/openshift/api/pull/1338)
 ~~~go
-replace github.com/openshift/api => github.com/rvanderp3/api v0.0.0-20230425185222-828ab2f6180c
+replace github.com/openshift/api => github.com/openshift-splat-team/api v0.0.0-20230425185222-828ab2f6180c
 ~~~
 4. Revendor 
 ~~~sh
