@@ -1,4 +1,4 @@
-FROM registry.ci.openshift.org/openshift/release:golang-1.19 AS builder
+FROM registry.ci.openshift.org/openshift/release:golang-1.20 AS builder
 WORKDIR /go/src/github.com/openshift-splat-team/machine-ipam-controller
 COPY . .
 ENV GO_PACKAGE github.com/openshift-splat-team/machine-ipam-controller
