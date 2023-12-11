@@ -17,7 +17,7 @@ MODE="${MODE:-release}"
 GIT_COMMIT="${SOURCE_GIT_COMMIT:-$(git rev-parse --verify 'HEAD^{commit}')}"
 GIT_TAG="${BUILD_VERSION:-$(git describe --always --abbrev=40 --dirty)}"
 GOFLAGS="${GOFLAGS:--mod=vendor}"
-LDFLAGS="${LDFLAGS} -X github.com/rvanderp3/mapi-static-ip-controller/pkg/version.Raw=${GIT_TAG} -X github.com/rvanderp3/mapi-static-ip-controller/pkg/version.Commit=${GIT_COMMIT}"
+LDFLAGS="${LDFLAGS} -X github.com/openshift-splat-team/mapi-static-ip-controller/pkg/version.Raw=${GIT_TAG} -X github.com/openshift-splat-team/mapi-static-ip-controller/pkg/version.Commit=${GIT_COMMIT}"
 TAGS="${TAGS:-}"
 OUTPUT="${OUTPUT:-bin/mapi-static-ip-controller}"
 export CGO_ENABLED=0

@@ -40,9 +40,9 @@ ifeq ($(NO_DOCKER), 1)
   DOCKER_CMD =
   IMAGE_BUILD_CMD = imagebuilder
 else
-  DOCKER_CMD := $(ENGINE) run --env GO111MODULE=$(GO111MODULE) --env GOFLAGS=$(GOFLAGS) --rm -v "$(PWD)":/go/src/github.com/rvanderp3/machine-ipam-controller:Z  -w /go/src/github.com/rvanderp3/machine-ipam-controller $(BUILD_IMAGE)
+  DOCKER_CMD := $(ENGINE) run --env GO111MODULE=$(GO111MODULE) --env GOFLAGS=$(GOFLAGS) --rm -v "$(PWD)":/go/src/github.com/openshift-splat-team/machine-ipam-controller:Z  -w /go/src/github.com/openshift-splat-team/machine-ipam-controller $(BUILD_IMAGE)
   # The command below is for building/testing with the actual image that Openshift uses. Uncomment/comment out to use instead of above command. CI registry pull secret is required to use this image.
-  # DOCKER_CMD := $(ENGINE) run --env GO111MODULE=$(GO111MODULE) --env GOFLAGS=$(GOFLAGS) --rm -v "$(PWD)":/go/src/github.com/rvanderp3/machine-ipam-controller:Z -w /go/src/github.com/rvanderp3/machine-ipam-controller registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.11
+  # DOCKER_CMD := $(ENGINE) run --env GO111MODULE=$(GO111MODULE) --env GOFLAGS=$(GOFLAGS) --rm -v "$(PWD)":/go/src/github.com/openshift-splat-team/machine-ipam-controller:Z -w /go/src/github.com/openshift-splat-team/machine-ipam-controller registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.11
   IMAGE_BUILD_CMD = $(ENGINE) build
 endif
 

@@ -3,7 +3,7 @@
 package fake
 
 import (
-	v1 "github.com/rvanderp3/machine-ipam-controller/pkg/generated/clientset/versioned/typed/ipamcontroller.openshift.io/v1"
+	v1 "github.com/openshift-splat-team/machine-ipam-controller/pkg/generated/clientset/versioned/typed/ipamcontroller.openshift.io/v1"
 	rest "k8s.io/client-go/rest"
 	testing "k8s.io/client-go/testing"
 )

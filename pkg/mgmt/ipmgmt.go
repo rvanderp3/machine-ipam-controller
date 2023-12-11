@@ -5,14 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
-	ipamv1 "sigs.k8s.io/cluster-api/exp/ipam/api/v1alpha1"
+
+	ipamv1 "sigs.k8s.io/cluster-api/exp/ipam/api/v1beta1"
 
 	goipam "github.com/metal-stack/go-ipam"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	v1 "github.com/rvanderp3/machine-ipam-controller/pkg/apis/ipamcontroller.openshift.io/v1"
+	v1 "github.com/openshift-splat-team/machine-ipam-controller/pkg/apis/ipamcontroller.openshift.io/v1"
 )
 
 type PoolInfo struct {
