@@ -7,15 +7,18 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/pkg/errors"
-	corev1 "k8s.io/api/core/v1"
-
 	osclientset "github.com/openshift/client-go/config/clientset/versioned"
 	mapiclientset "github.com/openshift/client-go/machine/clientset/versioned"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/klog/v2/klogr"
 	ipamv1 "sigs.k8s.io/cluster-api/exp/ipam/api/v1beta1"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -33,6 +36,8 @@ var (
 )
 
 func main() {
+	logger := klogr.New()
+	ctrl.SetLogger(logger)
 
 	mgr, err := manager.New(config.GetConfigOrDie(), manager.Options{})
 	if err != nil {
@@ -47,21 +52,15 @@ func main() {
 	ipamv1.AddToScheme(mgr.GetScheme())
 	ipamcontrollerv1.AddToScheme(mgr.GetScheme())
 
-	err = builder.
-		ControllerManagedBy(mgr). // Create the ControllerManagedBy
-		For(&ipamv1.IPAddressClaim{}).
-		Complete(&IPPoolClaimProcessor{})
-	if err != nil {
-		log.Error(err, "could not create claim processor")
+	if err := (&IPPoolClaimProcessor{}).
+		SetupWithManager(mgr); err != nil {
+		log.Error(err, "unable to create controller", "controller", "IPPoolClaimController")
 		os.Exit(1)
 	}
 
-	err = builder.
-		ControllerManagedBy(mgr). // Create the ControllerManagedBy
-		For(&ipamcontrollerv1.IPPool{}).
-		Complete(&IPPoolController{})
-	if err != nil {
-		log.Error(err, "could not create controller")
+	if err := (&IPPoolController{}).
+		SetupWithManager(mgr); err != nil {
+		log.Error(err, "unable to create controller", "controller", "IPPoolController")
 		os.Exit(1)
 	}
 
@@ -73,10 +72,18 @@ func main() {
 
 type IPPoolClaimProcessor struct {
 	client.Client
+	Scheme         *runtime.Scheme
+	Recorder       record.EventRecorder
+	RESTMapper     meta.RESTMapper
+	UncachedClient client.Client
 }
 
 type IPPoolController struct {
 	client.Client
+	Scheme         *runtime.Scheme
+	Recorder       record.EventRecorder
+	RESTMapper     meta.RESTMapper
+	UncachedClient client.Client
 }
 
 func (a *IPPoolClaimProcessor) BindClaim(ctx context.Context, ipAddressClaim *ipamv1.IPAddressClaim) error {
@@ -128,14 +135,34 @@ func (a *IPPoolClaimProcessor) ReleaseClaim(ctx context.Context, namespacedName 
 	return err
 }
 
+// SetupWithManager sets up the controller with the Manager.
+func (a *IPPoolClaimProcessor) SetupWithManager(mgr ctrl.Manager) error {
+	if err := ctrl.NewControllerManagedBy(mgr).
+		For(&ipamv1.IPAddressClaim{}).
+		Complete(a); err != nil {
+		return fmt.Errorf("could not set up controller for ip pool claim: %w", err)
+	}
+
+	// Set up API helpers from the manager.
+	a.Client = mgr.GetClient()
+	a.Scheme = mgr.GetScheme()
+	a.Recorder = mgr.GetEventRecorderFor("ip-pool-claim-controller")
+	a.RESTMapper = mgr.GetRESTMapper()
+
+	return nil
+}
+
 func (a *IPPoolClaimProcessor) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	log.Infof("Received request %v", req)
+	log.Infof("Reconciling request %v", req)
+	defer log.Infof("Finished reconciling request %v", req)
 
 	ipAddressClaim := &ipamv1.IPAddressClaim{}
-	if err := a.Get(ctx, req.NamespacedName, ipAddressClaim); err != nil {
+	claimKey := client.ObjectKey{Namespace: req.Namespace, Name: req.Name}
+
+	if err := a.Get(ctx, claimKey, ipAddressClaim); err != nil {
 		log.Warnf("Got error: %v", err)
 		if strings.Contains(fmt.Sprintf("%v%", err), "not found") {
 			log.Info("Handling remove of claim")
@@ -149,6 +176,7 @@ func (a *IPPoolClaimProcessor) Reconcile(ctx context.Context, req reconcile.Requ
 	// Check claim to see if it needs IP from a pool that we own.
 	poolRef := ipAddressClaim.Spec.PoolRef
 	log.Debugf("Kind(%v) Group(%v) Name(%v)", poolRef.Kind, *poolRef.APIGroup, poolRef.Name)
+
 	if poolRef.Kind == ipamcontrollerv1.IPPoolKind && *poolRef.APIGroup == ipamcontrollerv1.APIGroupName {
 		log.Debugf("Found a claim for an IP from this provider.  Status: %v", ipAddressClaim.Status)
 		if ipAddressClaim.Status.AddressRef.Name == "" {
@@ -229,14 +257,34 @@ func (a *IPPoolController) RemovePool(ctx context.Context, pool string) error {
 	return err
 }
 
+// SetupWithManager sets up the controller with the Manager.
+func (a *IPPoolController) SetupWithManager(mgr ctrl.Manager) error {
+	if err := ctrl.NewControllerManagedBy(mgr).
+		For(&ipamcontrollerv1.IPPool{}).
+		Complete(a); err != nil {
+		return fmt.Errorf("could not set up controller for ip pool: %w", err)
+	}
+
+	// Set up API helpers from the manager.
+	a.Client = mgr.GetClient()
+	a.Scheme = mgr.GetScheme()
+	a.Recorder = mgr.GetEventRecorderFor("ip-pool-controller")
+	a.RESTMapper = mgr.GetRESTMapper()
+
+	return nil
+}
+
 func (a *IPPoolController) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	log.Infof("Received request %v", req)
+	log.Infof("Reconciling request %v", req)
+	defer log.Infof("Finished reconciling request %v", req)
 
 	pool := &ipamcontrollerv1.IPPool{}
-	if err := a.Get(ctx, req.NamespacedName, pool); err != nil {
+	poolKey := client.ObjectKey{Namespace: req.Namespace, Name: req.Name}
+
+	if err := a.Get(ctx, poolKey, pool); err != nil {
 		log.Warnf("Got error: %v", err)
 		switch t := err.(type) {
 		default:
