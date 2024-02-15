@@ -101,7 +101,7 @@ objects:
             k8s-app: machine-ipam-controller
         spec:
           containers:
-            - image: quay.io/ocp-splat/machine-ipam-controller:latest
+            - image: quay.io/ocp-splat/machine-ipam-controller:${IPAM_VERSION}
               imagePullPolicy: Always
               name: machine-ipam-controller
               resources:
@@ -167,3 +167,6 @@ parameters:
     description: The prefix value used in the IPPool spec.
   - name: GATEWAY
     description: The gateway value used in the IPPool spec.
+  - name: IPAM_VERSION
+    description: The version tag to use for the container image.  Default value is LATEST.
+    value: latest
